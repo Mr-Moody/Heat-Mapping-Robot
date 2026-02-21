@@ -6,7 +6,7 @@ Sketch that sweeps an ultrasonic sensor and sends readings to the Python backend
 
 - **Board:** Any (Arduino Uno, ESP32, etc.) — Serial mode works on all; WiFi needs ESP32
 - **Libraries:** ArduinoJson (install via Library Manager)
-- **Hardware:** HC-SR04 ultrasonic, continuous rotation servo
+- **Hardware:** HC-SR04 ultrasonic, 180° micro servo
 
 ## Communication Modes
 
@@ -28,6 +28,16 @@ Works with any Arduino-compatible board. Connect via USB to the computer running
 3. Upload to ESP32
 4. Arduino POSTs to `POST /arduino/readings`
 
+## Servo Calibration (180° micro servo)
+
+Before running the main sketch, calibrate `SERVO_AT_MIN` and `SERVO_AT_MAX`:
+
+1. Open `servo_calibrate/servo_calibrate.ino` in Arduino IDE
+2. Upload, open Serial Monitor at 115200
+3. Use `a`/`d` to move the servo until the sensor points at your **left limit** (−90°), press `1` to save
+4. Use `a`/`d` to move to your **right limit** (+90°), press `2` to save
+5. Press `p` to print the values — copy them into `heat_mapping_robot.ino` as `SERVO_AT_MIN` and `SERVO_AT_MAX`
+
 ## Setup
 
 1. Open `heat_mapping_robot/heat_mapping_robot.ino` in Arduino IDE
@@ -35,7 +45,8 @@ Works with any Arduino-compatible board. Connect via USB to the computer running
 3. Set `USE_SERIAL` (1 for USB, 0 for WiFi)
 4. If WiFi: edit `WIFI_SSID`, `WIFI_PASSWORD`, `BACKEND_URL`
 5. Set correct pins: `TRIG_PIN`, `ECHO_PIN`, `SERVO_PIN`
-6. Upload
+6. Copy `SERVO_AT_MIN` and `SERVO_AT_MAX` from calibration
+7. Upload
 
 ## Wiring
 

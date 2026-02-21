@@ -15,6 +15,9 @@ from .analytics import (
     thermal_to_frontend_points,
 )
 
+# Cart is stationary — robot stays at 0,0,0 and does not rotate.
+CART_STATIONARY = True
+
 # Sweep bins: 12 sectors, each 30°. Index 0 = 0°, 3 = 90° left, 6 = 180°, 9 = 270° right.
 SWEEP_BINS = 12
 BIN_ANGLE = 360.0 / SWEEP_BINS
@@ -119,18 +122,18 @@ class ArduinoConnection():
         # Run path planner
         action, speed, turn_deg = self.planner.decide(reading, self.robot_state)
 
-        # Update robot state (simulate movement)
-        self.robot_state.heading_deg = (self.robot_state.heading_deg + turn_deg) % 360
-
-        move = PathPlanner.STEP_SIZE_M * speed
-        rad = math.radians(90 - self.robot_state.heading_deg)
-
-        self.robot_state.x += move * math.cos(rad)
-        self.robot_state.y += move * math.sin(rad)
-        self.robot_state.distance_travelled += move
         self.robot_state.action = action
         self.robot_state.speed = speed
         self.last_action = action
+
+        if not CART_STATIONARY:
+            # Update robot state (simulate movement)
+            self.robot_state.heading_deg = (self.robot_state.heading_deg + turn_deg) % 360
+            move = PathPlanner.STEP_SIZE_M * speed
+            rad = math.radians(90 - self.robot_state.heading_deg)
+            self.robot_state.x += move * math.cos(rad)
+            self.robot_state.y += move * math.sin(rad)
+            self.robot_state.distance_travelled += move
 
         analytics = compute_analytics(self.thermal_history)
         thermal_points = thermal_to_frontend_points(self.thermal_history)

@@ -7,7 +7,7 @@
  *
  * Hardware:
  *   - HC-SR04 ultrasonic: TRIG_PIN, ECHO_PIN
- *   - Continuous servo: SERVO_PIN (PWM)
+ *   - 180° micro servo: SERVO_PIN (positional)
  */
 
 #define USE_SERIAL 1   // 1 = USB serial, 0 = WiFi
@@ -27,10 +27,15 @@
 #endif
 #define CHUNK_SIZE      8                            // Readings per HTTP POST
 #define SWEEP_STEP_DEG  30.0                         // Angle step per reading
-#define SERVO_SPEED     90                            // 90 = stop, <90 CCW, >90 CW
+#define SWEEP_MIN_DEG   -90.0                        // Left limit
+#define SWEEP_MAX_DEG   90.0                         // Right limit, 0 = forwards
+#define ANGLE_OFFSET    0.0                          // fine-tune reported angle
+// Servo: 0°=right, 180°=left. Map our -90°(left) and +90°(right) accordingly.
+#define SERVO_AT_MIN    180                          // servo 180 = our -90° (left)
+#define SERVO_AT_MAX    0                            // servo 0 = our +90° (right)
 #define TRIG_PIN        5
 #define ECHO_PIN        7
-#define SERVO_PIN      13
+#define SERVO_PIN      9
 #define MAX_DISTANCE_CM 400
 #define MIN_DISTANCE_CM 2
 
@@ -67,20 +72,23 @@ float readDistanceCm()
 }
 
 // ── SERVO ─────────────────────────────────────────────────────────────────
-void stepServo() {
-  // Continuous servo: 90=stop, <90 one dir, >90 other
-  sweepServo.write(SERVO_SPEED);
-  delay(50);  // Allow servo to move
+// Maps logical angle (-90..+90) to servo PWM (SERVO_AT_MIN..SERVO_AT_MAX)
+int angleToServo(float deg) {
+  return (int)(SERVO_AT_MIN + (deg - SWEEP_MIN_DEG) * (SERVO_AT_MAX - SERVO_AT_MIN) / (SWEEP_MAX_DEG - SWEEP_MIN_DEG));
+}
 
+void stepServo() {
   currentAngle += sweepDirection ? SWEEP_STEP_DEG : -SWEEP_STEP_DEG;
 
-  if (currentAngle >= 360.0) {
-    currentAngle = 360.0 - SWEEP_STEP_DEG;
+  if (currentAngle >= SWEEP_MAX_DEG) {
+    currentAngle = SWEEP_MAX_DEG;
     sweepDirection = false;
-  } else if (currentAngle < 0.0) {
-    currentAngle = SWEEP_STEP_DEG;
+  } else if (currentAngle <= SWEEP_MIN_DEG) {
+    currentAngle = SWEEP_MIN_DEG;
     sweepDirection = true;
   }
+
+  sweepServo.write(angleToServo(currentAngle));
 }
 
 // ── SEND READINGS (Serial or WiFi) ────────────────────────────────────────
@@ -125,6 +133,10 @@ void setup() {
   pinMode(ECHO_PIN, INPUT);
 
   sweepServo.attach(SERVO_PIN);
+  currentAngle = 0.0;
+  sweepDirection = true;
+  sweepServo.write(angleToServo(0));
+  delay(500);  // let servo reach centre
 
 #if USE_SERIAL
   Serial.println("USB Serial mode - connect to Python backend");
@@ -150,7 +162,7 @@ void loop() {
   float dist = readDistanceCm();
   
   if (dist >= MIN_DISTANCE_CM && dist <= MAX_DISTANCE_CM) {
-    buffer[bufferIdx].angle = currentAngle;
+    buffer[bufferIdx].angle = currentAngle + ANGLE_OFFSET;
     buffer[bufferIdx].distance = dist;
     bufferIdx++;
 
@@ -171,5 +183,5 @@ void loop() {
   }
 
   stepServo();
-  delay(80);  // Debounce + servo settle
+  delay(100);  // Let positional servo reach target before ultrasonic read
 }

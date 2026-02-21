@@ -29,8 +29,9 @@ def _robot_state_from_connection(conn) -> RobotState:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Start demo simulator if SIMULATE=1, or USB serial reader (auto-detect or SERIAL_PORT)."""
-    simulate = os.environ.get("SIMULATE", "0").lower() in ("1", "true", "yes")
+    simulate = 0
     serial_port = os.environ.get("SERIAL_PORT")
+    
     if not serial_port and not simulate:
         serial_port = find_arduino_uno_port()
     serial_baud = int(os.environ.get("SERIAL_BAUD", "115200"))
