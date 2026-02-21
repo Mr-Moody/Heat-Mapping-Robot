@@ -38,6 +38,9 @@
 #define SERVO_PIN      9
 #define MAX_DISTANCE_CM 400
 #define MIN_DISTANCE_CM 2
+// Distance calibration: run distance_calibrate.ino to tune. 58.2 = standard HC-SR04.
+#define MICROSEC_PER_CM  58.2
+#define DISTANCE_OFFSET_CM 1.7   // raw 28.3 @ 30cm true → add 1.7
 
 // ── GLOBALS ────────────────────────────────────────────────────────────────
 struct Reading {
@@ -67,8 +70,8 @@ float readDistanceCm()
   if (duration == 0)
     return 0.0;
 
-  // 3. Convert to CM using your script's formula: (duration/2) / 29.1
-  return (duration / 2.0) / 29.1;
+  float cm = (float)duration / (float)MICROSEC_PER_CM + DISTANCE_OFFSET_CM;
+  return cm;
 }
 
 // ── SERVO ─────────────────────────────────────────────────────────────────
@@ -93,7 +96,7 @@ void stepServo() {
 
 // ── SEND READINGS (Serial or WiFi) ────────────────────────────────────────
 bool sendReadings(Reading* readings, int count) {
-  StaticJsonDocument<512> doc;
+  StaticJsonDocument<768> doc;  // 18 readings need ~600 bytes
   doc["timestamp_ms"] = (long)(millis() - startTimeMs);
 
   JsonArray arr = doc.createNestedArray("readings");

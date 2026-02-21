@@ -28,6 +28,19 @@ Works with any Arduino-compatible board. Connect via USB to the computer running
 3. Upload to ESP32
 4. Arduino POSTs to `POST /arduino/readings`
 
+## Distance Calibration (HC-SR04 ultrasonic)
+
+To verify and calibrate distance sensing for accurate point clouds:
+
+1. Open `distance_calibrate/distance_calibrate.ino`, upload, open Serial Monitor at 115200
+2. Place a flat object at a **known distance** (e.g. 50 cm) in front of the sensor
+3. Compare `adjusted_cm` with your ruler measurement
+4. Adjust `MICROSEC_PER_CM` (default 58.2): increase if sensor reads too high, decrease if too low
+5. Adjust `DISTANCE_OFFSET_CM` for additive correction (e.g. -1.5 if consistently 1.5 cm high)
+6. Copy the values into `heat_mapping_robot.ino`
+
+**Backend verification:** Run `python scripts/verify_distance.py` (with SERIAL_PORT set) to see raw angle/distance and the resulting Cartesian (x, y, z) points. Confirms the full pipeline from serial → point cloud.
+
 ## Servo Calibration (180° micro servo)
 
 Before running the main sketch, calibrate `SERVO_AT_MIN` and `SERVO_AT_MAX`:
@@ -45,8 +58,9 @@ Before running the main sketch, calibrate `SERVO_AT_MIN` and `SERVO_AT_MAX`:
 3. Set `USE_SERIAL` (1 for USB, 0 for WiFi)
 4. If WiFi: edit `WIFI_SSID`, `WIFI_PASSWORD`, `BACKEND_URL`
 5. Set correct pins: `TRIG_PIN`, `ECHO_PIN`, `SERVO_PIN`
-6. Copy `SERVO_AT_MIN` and `SERVO_AT_MAX` from calibration
-7. Upload
+6. Copy `SERVO_AT_MIN` and `SERVO_AT_MAX` from servo calibration
+7. Copy `MICROSEC_PER_CM` and `DISTANCE_OFFSET_CM` from distance calibration (if tuned)
+8. Upload
 
 ## Wiring
 

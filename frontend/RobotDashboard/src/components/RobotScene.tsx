@@ -4,17 +4,19 @@ import { useRef, useMemo, useEffect } from 'react'
 import * as THREE from 'three'
 import { useRobotData } from '../hooks/useRobotData'
 
-const wheelRadius = 0.16
-const wheelWidth = 0.08
-const casterRadius = 0.06
-const bodyWidth = 0.5
-const bodyHeight = 0.12
-const bodyDepth = 0.6
+// Robot model: 1/2 scale, units in metres (matches point cloud: distance_cm/100)
+const SCALE = 0.5
+const wheelRadius = 0.16 * SCALE
+const wheelWidth = 0.08 * SCALE
+const casterRadius = 0.06 * SCALE
+const bodyWidth = 0.5 * SCALE
+const bodyHeight = 0.12 * SCALE
+const bodyDepth = 0.6 * SCALE
 const wheelX = bodyWidth / 2 + wheelWidth / 2
 const wheelZ = bodyDepth / 2 + wheelWidth / 2
 
-const servoHeight = 0.2;
-const servoRadius = 0.04;
+const servoHeight = 0.2 * SCALE
+const servoRadius = 0.04 * SCALE
 
 // Two wheels at the back (negative Z)
 const wheelPositions: [number, number, number][] = [
@@ -50,7 +52,7 @@ function Robot({ x, y, heading_deg }: RobotProps) {
           <meshStandardMaterial color="#AAAAAA" />
       </mesh>
       <mesh position={[0, casterRadius*2 + servoHeight * 2 / 3, wheelZ - 2.5*casterRadius]}>
-        <boxGeometry args={[0.3, 0.1, 0.1]} />
+        <boxGeometry args={[0.3 * SCALE, 0.1 * SCALE, 0.1 * SCALE]} />
         <meshStandardMaterial color="#2D2D2D" />
       </mesh>
     </group>
@@ -85,7 +87,7 @@ function PointCloud({ points }: PointCloudProps) {
       positions[i * 3 + 1] = p[1]
       positions[i * 3 + 2] = p[2]
     })
-    
+
     geom.setAttribute('position', new THREE.BufferAttribute(positions, 3))
     geom.attributes.position.needsUpdate = true
   }, [points])
@@ -103,7 +105,7 @@ function PointCloud({ points }: PointCloudProps) {
         />
       </bufferGeometry>
       <pointsMaterial
-        size={0.02}
+        size={0.01}
         color={0x000000}
         sizeAttenuation
       />
