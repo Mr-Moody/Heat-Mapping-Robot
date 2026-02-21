@@ -24,6 +24,7 @@ def _robot_state_from_connection(conn) -> RobotState:
 async def lifespan(app: FastAPI):
     """Start demo simulator if SIMULATE=1 (no Arduino needed)."""
     simulate = os.environ.get("SIMULATE", "0").lower() in ("1", "true", "yes")
+    simulate = 1
     running = True
     task = None
 
@@ -114,7 +115,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
     except WebSocketDisconnect:
         pass
-    
+
     finally:
         if websocket in ws_connections:
             ws_connections.remove(websocket)

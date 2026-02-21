@@ -64,23 +64,6 @@ interface PointCloudProps {
 function PointCloud({ points }: PointCloudProps) {
   const pointsRef = useRef<THREE.Points>(null)
 
-  useEffect(() => {
-    if (!pointsRef.current || points.length === 0) return
-    const geom = pointsRef.current.geometry
-    const positions = new Float32Array(points.length * 3)
-    points.forEach((p, i) => {
-      positions[i * 3] = p[0]
-      positions[i * 3 + 1] = p[1]
-      positions[i * 3 + 2] = p[2]
-    })
-    geom.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-    geom.attributes.position.needsUpdate = true
-  }, [points])
-
-  if (points.length === 0) {
-    return null
-  }
-
   const initialPositions = useMemo(() => {
     const arr = new Float32Array(points.length * 3)
     points.forEach((p, i) => {
@@ -90,6 +73,26 @@ function PointCloud({ points }: PointCloudProps) {
     })
     return arr
   }, [points])
+
+  useEffect(() => {
+    if (!pointsRef.current || points.length === 0) return
+
+    const geom = pointsRef.current.geometry
+    const positions = new Float32Array(points.length * 3)
+
+    points.forEach((p, i) => {
+      positions[i * 3] = p[0]
+      positions[i * 3 + 1] = p[1]
+      positions[i * 3 + 2] = p[2]
+    })
+    
+    geom.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+    geom.attributes.position.needsUpdate = true
+  }, [points])
+
+  if (points.length === 0) {
+    return null
+  }
 
   return (
     <points ref={pointsRef}>
