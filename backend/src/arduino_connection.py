@@ -19,9 +19,11 @@ from .analytics import (
 CART_STATIONARY = True
 
 # Sweep bins: 12 sectors, each 30°. Index 0 = 0°, 3 = 90° left, 6 = 180°, 9 = 270° right.
-SWEEP_BINS = 12
-BIN_ANGLE = 360.0 / SWEEP_BINS
+BIN_ANGLE = 10.0
+SWEEP_BINS = int(180.0 / BIN_ANGLE)
+
 MAX_POINT_CLOUD_SIZE = 2000
+DISPLAY_POINT_LIMIT = 2 * SWEEP_BINS
 
 
 def _bin_readings_to_sweep(readings: list[tuple[float, float]]) -> list[float]:
@@ -137,9 +139,10 @@ class ArduinoConnection():
 
         analytics = compute_analytics(self.thermal_history)
         thermal_points = thermal_to_frontend_points(self.thermal_history)
+        display_points = self.point_cloud[-DISPLAY_POINT_LIMIT:]
 
         return FrontendUpdate(
-            points=self.point_cloud,
+            points=display_points,
             robot=RobotPose(
                 x=self.robot_state.x,
                 y=self.robot_state.y,
@@ -155,8 +158,9 @@ class ArduinoConnection():
         """Return current state for new WebSocket clients."""
         analytics = compute_analytics(self.thermal_history)
         thermal_points = thermal_to_frontend_points(self.thermal_history)
+        display_points = self.point_cloud[-DISPLAY_POINT_LIMIT:]
         return FrontendUpdate(
-            points=self.point_cloud,
+            points=display_points,
             robot=RobotPose(
                 x=self.robot_state.x,
                 y=self.robot_state.y,

@@ -26,7 +26,7 @@
 #define BACKEND_URL     "http://192.168.1.100:8000"  // Python backend IP
 #endif
 #define CHUNK_SIZE      8                            // Readings per HTTP POST
-#define SWEEP_STEP_DEG  30.0                         // Angle step per reading
+#define SWEEP_STEP_DEG  10.0                         // Angle step per reading
 #define SWEEP_MIN_DEG   -90.0                        // Left limit
 #define SWEEP_MAX_DEG   90.0                         // Right limit, 0 = forwards
 #define ANGLE_OFFSET    0.0                          // fine-tune reported angle
