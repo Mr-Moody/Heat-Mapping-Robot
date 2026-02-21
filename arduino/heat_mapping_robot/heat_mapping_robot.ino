@@ -23,7 +23,7 @@
 #define SWEEP_STEP_DEG  30.0                         // Angle step per reading
 #define SERVO_SPEED     90                            // 90 = stop, <90 CCW, >90 CW
 #define TRIG_PIN        5
-#define ECHO_PIN       18
+#define ECHO_PIN        7
 #define SERVO_PIN      13
 #define MAX_DISTANCE_CM 400
 #define MIN_DISTANCE_CM 2
@@ -41,17 +41,23 @@ unsigned long startTimeMs = 0;
 Servo sweepServo;
 
 // ── ULTRASONIC ────────────────────────────────────────────────────────────
-float readDistanceCm() {
+float readDistanceCm()
+{
+  // 1. Clean pulse logic from your test script
   digitalWrite(TRIG_PIN, LOW);
-  delayMicroseconds(2);
+  delayMicroseconds(5);
   digitalWrite(TRIG_PIN, HIGH);
   delayMicroseconds(10);
   digitalWrite(TRIG_PIN, LOW);
 
-  long duration = pulseIn(ECHO_PIN, HIGH, 30000);  // 30ms timeout ~5m
-  if (duration == 0) return 0.0;
+  // 2. Read the signal
+  long duration = pulseIn(ECHO_PIN, HIGH, 30000);
 
-  return duration * 0.0343 / 2.0;  // cm
+  if (duration == 0)
+    return 0.0;
+
+  // 3. Convert to CM using your script's formula: (duration/2) / 29.1
+  return (duration / 2.0) / 29.1;
 }
 
 // ── SERVO ─────────────────────────────────────────────────────────────────
