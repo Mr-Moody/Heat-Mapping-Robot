@@ -1,0 +1,16 @@
+@import "tailwindcss";
+
+@theme {
+  --color-uber-black: #191919;
+  --color-uber-white: #FCFCFC;
+  --color-uber-gray-light: #979797;
+  --color-uber-gray-mid: #5D5D60;
+  --color-uber-gray-dark: #2D2D2D;
+}
+
+@layer base {
+  body {
+    @apply bg-uber-white text-uber-black font-sans antialiased;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+}
