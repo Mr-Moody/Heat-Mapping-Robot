@@ -9,6 +9,11 @@ from typing import Callable
 from .models import ArduinoReadingsPayload, FrontendUpdate, RobotPose
 from .point_cloud import readings_to_points, add_to_ring_buffer
 from .path_planning import PathPlanner, RobotState, SensorReading
+from .analytics import (
+    ThermalReading,
+    compute_analytics,
+    thermal_to_frontend_points,
+)
 
 # Sweep bins: 12 sectors, each 30°. Index 0 = 0°, 3 = 90° left, 6 = 180°, 9 = 270° right.
 SWEEP_BINS = 12
@@ -49,6 +54,7 @@ class ArduinoConnection():
         self.last_sweep_cm: list[float] = [150.0] * SWEEP_BINS
         self.last_action = "IDLE"
         self._timestamp_ms = 0
+        self.thermal_history: list[ThermalReading] = []
 
     def receive_readings(self, payload: ArduinoReadingsPayload) -> FrontendUpdate:
         """
@@ -81,15 +87,34 @@ class ArduinoConnection():
             self.point_cloud, new_points, MAX_POINT_CLOUD_SIZE
         )
 
-        # Build SensorReading for path planner (no DHT11 from Arduino yet)
+        # Build SensorReading for path planner (use thermal from payload if present)
         forward_cm = sweep_cm[0]
+        temp = payload.air_temp_c if payload.air_temp_c is not None else 20.0
+        humidity = payload.humidity_pct if payload.humidity_pct is not None else 50.0
         reading = SensorReading(
             forward_cm=forward_cm,
             sweep_cm=sweep_cm,
-            temperature=20.0,
-            humidity=50.0,
+            temperature=temp,
+            humidity=humidity,
             timestamp_ms=payload.timestamp_ms,
         )
+
+        # Append thermal to history for analytics (use surface or air temp)
+        if payload.air_temp_c is not None or payload.surface_temp_c is not None:
+            surface = payload.surface_temp_c or payload.air_temp_c or 20.0
+            air = payload.air_temp_c or payload.surface_temp_c or 20.0
+            room_id = int(self.robot_state.x / 1.5)  # ~1.5m per room
+            self.thermal_history.append(
+                ThermalReading(
+                    x_m=self.robot_state.x,
+                    y_m=self.robot_state.y,
+                    surface_temp_c=surface,
+                    air_temp_c=air,
+                    room_id=max(0, room_id),
+                )
+            )
+            if len(self.thermal_history) > 500:
+                self.thermal_history = self.thermal_history[-500:]
 
         # Run path planner
         action, speed, turn_deg = self.planner.decide(reading, self.robot_state)
@@ -107,6 +132,9 @@ class ArduinoConnection():
         self.robot_state.speed = speed
         self.last_action = action
 
+        analytics = compute_analytics(self.thermal_history)
+        thermal_points = thermal_to_frontend_points(self.thermal_history)
+
         return FrontendUpdate(
             points=self.point_cloud,
             robot=RobotPose(
@@ -116,10 +144,14 @@ class ArduinoConnection():
             ),
             action=action,
             sweep_cm=sweep_cm,
+            thermal_points=thermal_points,
+            analytics=analytics,
         )
 
     def get_current_state(self) -> FrontendUpdate:
         """Return current state for new WebSocket clients."""
+        analytics = compute_analytics(self.thermal_history)
+        thermal_points = thermal_to_frontend_points(self.thermal_history)
         return FrontendUpdate(
             points=self.point_cloud,
             robot=RobotPose(
@@ -129,6 +161,8 @@ class ArduinoConnection():
             ),
             action=self.last_action,
             sweep_cm=self.last_sweep_cm,
+            thermal_points=thermal_points,
+            analytics=analytics,
         )
 
 

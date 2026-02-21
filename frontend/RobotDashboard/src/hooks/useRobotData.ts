@@ -8,11 +8,31 @@ export interface RobotPose {
   heading_deg: number
 }
 
+export interface ThermalPoint {
+  x_m: number
+  y_m: number
+  surface_temp_c: number
+  air_temp_c: number
+  room_id: number
+  is_overheated: boolean
+}
+
+export interface AnalyticsSummary {
+  wasted_power_w: number
+  hot_zone_count: number
+  max_temp_c: number
+  avg_temp_c: number
+  setpoint_c: number
+  overheat_threshold_c: number
+}
+
 export interface RobotData {
   points: number[][]
   robot: RobotPose
   action: string
   sweep_cm: number[]
+  thermal_points?: ThermalPoint[]
+  analytics?: AnalyticsSummary
 }
 
 const defaultRobot: RobotPose = { x: 0, y: 0, heading_deg: 0 }
@@ -23,6 +43,7 @@ export function useRobotData() {
     robot: defaultRobot,
     action: 'IDLE',
     sweep_cm: [],
+    thermal_points: [],
   })
   const [connected, setConnected] = useState(false)
 
@@ -45,6 +66,8 @@ export function useRobotData() {
             robot: msg.robot ?? defaultRobot,
             action: msg.action ?? 'IDLE',
             sweep_cm: msg.sweep_cm ?? [],
+            thermal_points: msg.thermal_points ?? [],
+            analytics: msg.analytics,
           })
         } catch {
           // Ignore parse errors

@@ -1,3 +1,5 @@
+import os
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -5,12 +7,54 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src.models import ArduinoReadingsPayload
 from src.arduino_connection import get_connection
+from src.fake_sensors import generate_fake_payload
+from src.path_planning import RobotState
+
+
+def _robot_state_from_connection(conn) -> RobotState:
+    rs = conn.robot_state
+    return RobotState(
+        x=rs.x, y=rs.y, heading_deg=rs.heading_deg,
+        speed=rs.speed, action=rs.action,
+        distance_travelled=getattr(rs, "distance_travelled", 0.0),
+    )
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Start demo simulator if SIMULATE=1 (no Arduino needed)."""
+    simulate = os.environ.get("SIMULATE", "0").lower() in ("1", "true", "yes")
+    running = True
+    task = None
+
+    if simulate:
+        async def _demo_loop():
+            conn = get_connection()
+            ts = 0
+            while running:
+                robot = _robot_state_from_connection(conn)
+                payload = generate_fake_payload(robot, timestamp_ms=ts, include_thermal=True)
+                update = conn.receive_readings(payload)
+                msg = update.model_dump_json()
+                for ws in list(ws_connections):
+                    try:
+                        await ws.send_text(msg)
+                    except Exception:
+                        pass
+                ts += 500
+                await asyncio.sleep(0.5)
+
+        task = asyncio.create_task(_demo_loop())
+
     yield
-    # Cleanup if needed
+
+    if task is not None:
+        running = False
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
 
 app = FastAPI(lifespan=lifespan)
