@@ -1,6 +1,9 @@
+import logging
 import os
 import asyncio
+import threading
 from contextlib import asynccontextmanager
+from queue import Queue
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,6 +12,9 @@ from src.models import ArduinoReadingsPayload
 from src.arduino_connection import get_connection
 from src.fake_sensors import generate_fake_payload
 from src.path_planning import RobotState
+from src.serial_reader import run_serial_reader, find_arduino_uno_port
+
+logger = logging.getLogger(__name__)
 
 
 def _robot_state_from_connection(conn) -> RobotState:
@@ -22,11 +28,18 @@ def _robot_state_from_connection(conn) -> RobotState:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Start demo simulator if SIMULATE=1 (no Arduino needed)."""
+    """Start demo simulator if SIMULATE=1, or USB serial reader (auto-detect or SERIAL_PORT)."""
     simulate = os.environ.get("SIMULATE", "0").lower() in ("1", "true", "yes")
-    simulate = 1
+    serial_port = os.environ.get("SERIAL_PORT")
+    if not serial_port and not simulate:
+        serial_port = find_arduino_uno_port()
+    serial_baud = int(os.environ.get("SERIAL_BAUD", "115200"))
+
     running = True
-    task = None
+    sim_task = None
+    serial_task = None
+    serial_stop = threading.Event()
+    serial_thread = None
 
     if simulate:
         async def _demo_loop():
@@ -45,17 +58,52 @@ async def lifespan(app: FastAPI):
                 ts += 500
                 await asyncio.sleep(0.5)
 
-        task = asyncio.create_task(_demo_loop())
+        sim_task = asyncio.create_task(_demo_loop())
+
+    elif serial_port:
+        update_queue: Queue = Queue()
+        conn = get_connection()
+        serial_stop = threading.Event()
+        serial_thread = threading.Thread(
+            target=run_serial_reader,
+            args=(serial_port, serial_baud, conn, update_queue, serial_stop),
+            daemon=True,
+        )
+        serial_thread.start()
+        logger.info("Serial reader started on %s", serial_port)
+
+        async def _serial_broadcast_loop():
+            while running:
+                try:
+                    msg = await asyncio.to_thread(update_queue.get)
+                    for ws in list(ws_connections):
+                        try:
+                            await ws.send_text(msg)
+                        except Exception:
+                            pass
+                except asyncio.CancelledError:
+                    break
+
+        serial_task = asyncio.create_task(_serial_broadcast_loop())
 
     yield
 
-    if task is not None:
-        running = False
-        task.cancel()
+    running = False
+    if sim_task is not None:
+        sim_task.cancel()
         try:
-            await task
+            await sim_task
         except asyncio.CancelledError:
             pass
+    if serial_task is not None:
+        serial_task.cancel()
+        try:
+            await serial_task
+        except asyncio.CancelledError:
+            pass
+    if serial_thread is not None:
+        serial_stop.set()
+        serial_thread.join(timeout=2.0)
 
 
 app = FastAPI(lifespan=lifespan)
