@@ -4,19 +4,22 @@ import { useRef, useMemo, useEffect } from 'react'
 import * as THREE from 'three'
 import { useRobotData } from '../hooks/useRobotData'
 
-const wheelRadius = 0.15
-const wheelWidth = 0.1
-const bodyWidth = 1
-const bodyHeight = 0.5
-const bodyDepth = 0.5
+const wheelRadius = 0.16
+const wheelWidth = 0.08
+const casterRadius = 0.06
+const bodyWidth = 0.5
+const bodyHeight = 0.12
+const bodyDepth = 0.6
 const wheelX = bodyWidth / 2 + wheelWidth / 2
 const wheelZ = bodyDepth / 2 + wheelWidth / 2
 
+const servoHeight = 0.2;
+const servoRadius = 0.04;
+
+// Two wheels at the back (negative Z)
 const wheelPositions: [number, number, number][] = [
-  [-wheelX, wheelRadius, wheelZ],
-  [wheelX, wheelRadius, wheelZ],
-  [-wheelX, wheelRadius, -wheelZ],
-  [wheelX, wheelRadius, -wheelZ],
+  [-wheelX, wheelRadius/2, -wheelZ + wheelRadius],
+  [wheelX, wheelRadius/2, -wheelZ + wheelRadius],
 ]
 
 interface RobotProps {
@@ -33,11 +36,23 @@ function Robot({ x, y, heading_deg }: RobotProps) {
         <meshStandardMaterial color="#2D2D2D" />
       </mesh>
       {wheelPositions.map((pos, i) => (
-        <mesh key={i} position={pos} rotation={[Math.PI / 2, 0, 0]}>
+        <mesh key={i} position={pos} rotation={[0, 0, Math.PI / 2]}>
           <cylinderGeometry args={[wheelRadius, wheelRadius, wheelWidth, 16]} />
           <meshStandardMaterial color="#191919" />
         </mesh>
       ))}
+      <mesh position={[0, casterRadius/2, wheelZ - 3*casterRadius]}>
+        <sphereGeometry args={[casterRadius, 16, 16]} />
+        <meshStandardMaterial color="#FFFFFF" />
+      </mesh>
+      <mesh  position={[0, casterRadius*2, wheelZ - 3*casterRadius]} rotation={[0, Math.PI / 2, 0]}>
+          <cylinderGeometry args={[servoRadius, servoRadius, servoHeight, 16]} />
+          <meshStandardMaterial color="#AAAAAA" />
+      </mesh>
+      <mesh position={[0, casterRadius*2 + servoHeight * 2 / 3, wheelZ - 2.5*casterRadius]}>
+        <boxGeometry args={[0.3, 0.1, 0.1]} />
+        <meshStandardMaterial color="#2D2D2D" />
+      </mesh>
     </group>
   )
 }
