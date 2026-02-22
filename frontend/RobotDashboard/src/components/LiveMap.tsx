@@ -176,11 +176,13 @@ export default function LiveMap({
     if (obstacleCells && obstacleCells.length > 0) {
       const cellW = w / cols
       const cellH = h / rows
+      const halfW = cellW / 2
+      const halfH = cellH / 2
       ctx.fillStyle = '#000000'
       for (const [row, col] of obstacleCells) {
-        const px = (col / cols) * w
-        const py = (row / rows) * h
-        ctx.fillRect(px, py, cellW, cellH)
+        const cx = ((col + 0.5) / cols) * w
+        const cy = ((row + 0.5) / rows) * h
+        ctx.fillRect(cx - halfW / 2, cy - halfH / 2, halfW, halfH)
       }
     }
   }, [grid, rows, cols, hRows, hCols, state, trail, heatmapCells, obstacleCells])

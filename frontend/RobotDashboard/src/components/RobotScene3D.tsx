@@ -172,13 +172,13 @@ interface ObstacleCuboidsProps {
 
 function ObstacleCuboids({ cells }: ObstacleCuboidsProps) {
   if (!cells || cells.length === 0) return null
-  const cellSize = 1
+  const halfCellSize = 0.5
   const height = 0.5
   return (
     <group>
       {cells.map(([row, col], i) => (
         <mesh key={i} position={[col + 0.5, height / 2, row + 0.5]}>
-          <boxGeometry args={[cellSize, height, cellSize]} />
+          <boxGeometry args={[halfCellSize, height, halfCellSize]} />
           <meshStandardMaterial color="#000000" />
         </mesh>
       ))}
