@@ -58,6 +58,14 @@ class RobotState:
     distance_travelled: float = 0.0
 
 
+# CPP (Coverage Path Planning) states for Boustrophedon lawnmower
+CPP_BOUNDARY_TRACE = "BOUNDARY_TRACE"
+CPP_LAWNMOWER_FORWARD = "LAWNMOWER_FORWARD"
+CPP_LAWNMOWER_TURN = "LAWNMOWER_TURN"
+CPP_LAWNMOWER_BACK = "LAWNMOWER_BACK"
+STOP_AND_SAMPLE = "STOP_AND_SAMPLE"
+
+
 # ── FAKE SENSOR READER ────────────────────────────────────────────────────────
 
 class FakeSensorReader:
@@ -131,6 +139,8 @@ class PathPlanner:
       1. Obstacle avoidance  — hard stop if forward < OBSTACLE_THRESHOLD
       2. Wall following      — maintain target distance from left wall
       3. 360° sweep logic    — if stuck, do a full sweep and pick best direction
+
+    Plus: Boustrophedon CPP mode and stop-and-sample every 50cm for DHT11.
     """
 
     OBSTACLE_THRESHOLD_CM = 25.0   # Stop and turn if closer than this
@@ -140,16 +150,64 @@ class PathPlanner:
     SPEED_NORMAL          = 1.0
     SPEED_TURNING         = 0.6
     STEP_SIZE_M           = 0.05   # How far robot moves per step (metres)
+    STOP_SAMPLE_INTERVAL_M = 0.5   # Stop-and-sample every 50cm for DHT11 lag
+    STOP_SAMPLE_PAUSE_MS   = 2000  # DHT11 needs ~2s to stabilize
 
     def __init__(self):
         self.consecutive_obstacles = 0
         self.last_action = "IDLE"
+        self.last_sample_distance = 0.0
+        self.last_sample_timestamp_ms = 0
+        self.in_stop_sample = False
+        self.cpp_mode = "WALL_FOLLOW"  # WALL_FOLLOW | BOUNDARY_TRACE | LAWNMOWER
+        self.lawnmower_strip = 0
+        self.lawnmower_direction = 1  # 1 = forward, -1 = backward
 
-    def decide(self, reading: SensorReading, state: RobotState) -> tuple[str, float, float]:
+    def decide(
+        self,
+        reading: SensorReading,
+        state: RobotState,
+        occupancy_best: tuple[str, float] | None = None,
+    ) -> tuple[str, float, float]:
         """
         Returns (action, speed, turn_angle_deg).
-        turn_angle_deg: positive = turn right, negative = turn left
+        If occupancy_best is provided, use it for navigation (priority over sensor-based).
         """
+
+        # ── Occupancy-grid navigation (backend-driven) ───────────────────────
+        if occupancy_best is not None:
+            cmd, turn = occupancy_best
+            if cmd == "F":
+                if reading.forward_cm < self.OBSTACLE_THRESHOLD_CM:
+                    if reading.left_cm > reading.right_cm:
+                        return ("AVOID_TURN_LEFT", self.SPEED_TURNING, -45.0)
+                    return ("AVOID_TURN_RIGHT", self.SPEED_TURNING, 45.0)
+                return ("FORWARD", self.SPEED_NORMAL, 0.0)
+            if cmd == "L":
+                return ("TURN_LEFT", self.SPEED_TURNING, turn)
+            if cmd == "R":
+                return ("TURN_RIGHT", self.SPEED_TURNING, turn)
+            if cmd == "S":
+                return ("STOP", 0.0, 0.0)
+
+        # ── Stop-and-sample: every 50cm, pause 2s for DHT11 (only when not occupancy mode) ─
+        if self.in_stop_sample:
+            elapsed = reading.timestamp_ms - self.last_sample_timestamp_ms
+            if elapsed >= self.STOP_SAMPLE_PAUSE_MS:
+                self.in_stop_sample = False
+            else:
+                return (STOP_AND_SAMPLE, 0.0, 0.0)
+
+        dist_since_sample = state.distance_travelled - self.last_sample_distance
+        if dist_since_sample >= self.STOP_SAMPLE_INTERVAL_M:
+            self.last_sample_distance = state.distance_travelled
+            self.last_sample_timestamp_ms = reading.timestamp_ms
+            self.in_stop_sample = True
+            return (STOP_AND_SAMPLE, 0.0, 0.0)
+
+        # ── Boustrophedon CPP mode (lawnmower) ───────────────────────────────
+        if self.cpp_mode == "LAWNMOWER":
+            return self._decide_lawnmower(reading, state)
 
         # ── Layer 1: Full sweep if very stuck ────────────────────────────────
         if reading.forward_cm < self.STUCK_THRESHOLD_CM:
@@ -182,6 +240,24 @@ class PathPlanner:
 
         # All clear — drive straight
         return ("FORWARD", self.SPEED_NORMAL, 0.0)
+
+    def _decide_lawnmower(
+        self, reading: SensorReading, state: RobotState
+    ) -> tuple[str, float, float]:
+        """Boustrophedon lawnmower: forward, turn 180, backward, turn 180, repeat."""
+        # Obstacle in path: turn and switch strip
+        if reading.forward_cm < self.OBSTACLE_THRESHOLD_CM:
+            self.lawnmower_direction *= -1
+            if reading.left_cm > reading.right_cm:
+                return (CPP_LAWNMOWER_TURN, self.SPEED_TURNING, -90.0)
+            return (CPP_LAWNMOWER_TURN, self.SPEED_TURNING, 90.0)
+        if self.lawnmower_direction > 0:
+            return (CPP_LAWNMOWER_FORWARD, self.SPEED_NORMAL, 0.0)
+        return (CPP_LAWNMOWER_BACK, self.SPEED_NORMAL, 0.0)
+
+    def set_cpp_mode(self, mode: str):
+        """Set CPP mode: WALL_FOLLOW, BOUNDARY_TRACE, LAWNMOWER."""
+        self.cpp_mode = mode
 
     def _sweep_best_direction(self, sweep_cm: List[float]) -> float:
         """

@@ -4,6 +4,42 @@ import { useRef, useMemo, useEffect } from 'react'
 import * as THREE from 'three'
 import { useRobotData } from '../hooks/useRobotData'
 
+const NO_DATA = -999
+
+function tempToColor(t: number): [number, number, number] {
+  if (t <= NO_DATA + 1) return [0.2, 0.2, 0.2]
+  const cold = 15, mild = 20, warm = 25, hot = 30
+  if (t < cold) return [0, 0, 0.8]
+  if (t < mild) return [0, 0.5 + (t - cold) / (mild - cold) * 0.5, 0.8]
+  if (t < warm) return [(t - mild) / (warm - mild) * 1, 1, 0.2]
+  if (t < hot) return [1, 1 - (t - warm) / (hot - warm) * 0.5, 0]
+  return [1, 0.2, 0]
+}
+
+function gridToDataTexture(
+  grid: number[][],
+  colorFn: (v: number) => [number, number, number]
+): THREE.DataTexture {
+  const rows = grid.length
+  const cols = grid[0]?.length ?? 0
+  const data = new Uint8Array(cols * rows * 4)
+  for (let i = 0; i < rows; i++) {
+    for (let j = 0; j < cols; j++) {
+      const v = grid[i]?.[j] ?? 0
+      const [r, g, b] = colorFn(v)
+      const idx = (i * cols + j) * 4
+      data[idx] = Math.round(r * 255)
+      data[idx + 1] = Math.round(g * 255)
+      data[idx + 2] = Math.round(b * 255)
+      data[idx + 3] = v <= NO_DATA + 1 ? 0 : 200
+    }
+  }
+  const tex = new THREE.DataTexture(data, cols, rows)
+  tex.needsUpdate = true
+  tex.flipY = true
+  return tex
+}
+
 // Robot model: 1/2 scale, units in metres (matches point cloud: distance_cm/100)
 const SCALE = 0.25
 const wheelRadius = 0.16 * SCALE
@@ -113,16 +149,91 @@ function PointCloud({ points }: PointCloudProps) {
   )
 }
 
+interface ThermalOverlayProps {
+  grid: number[][] | null | undefined
+  bounds: [number, number, number, number] | null | undefined
+}
+
+function ThermalGroundOverlay({ grid, bounds }: ThermalOverlayProps) {
+  const tex = useMemo(() => {
+    if (!grid?.length || !bounds) return null
+    return gridToDataTexture(grid, tempToColor)
+  }, [grid, bounds])
+
+  useEffect(() => () => tex?.dispose(), [tex])
+
+  if (!tex || !bounds) return null
+  const [xMin, xMax, yMin, yMax] = bounds
+  const width = xMax - xMin
+  const depth = yMax - yMin
+  const cx = (xMin + xMax) / 2
+  const cz = (yMin + yMax) / 2
+
+  return (
+    <mesh position={[cx, 0.001, cz]} rotation={[-Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[width, depth]} />
+      <meshBasicMaterial
+        map={tex}
+        transparent
+        opacity={0.75}
+        depthWrite={false}
+      />
+    </mesh>
+  )
+}
+
+interface OccupancyOverlayProps {
+  grid: number[][] | null | undefined
+  bounds: [number, number, number, number] | null | undefined
+}
+
+function OccupancyGroundOverlay({ grid, bounds }: OccupancyOverlayProps) {
+  const tex = useMemo(() => {
+    if (!grid?.length || !bounds) return null
+    return gridToDataTexture(grid, (p) => {
+      const v = 1 - p
+      return [v, v, v]
+    })
+  }, [grid, bounds])
+
+  useEffect(() => () => tex?.dispose(), [tex])
+
+  if (!tex || !bounds) return null
+  const [xMin, xMax, yMin, yMax] = bounds
+  const width = xMax - xMin
+  const depth = yMax - yMin
+  const cx = (xMin + xMax) / 2
+  const cz = (yMin + yMax) / 2
+
+  return (
+    <mesh position={[cx, 0.0005, cz]} rotation={[-Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[width, depth]} />
+      <meshBasicMaterial
+        map={tex}
+        transparent
+        opacity={0.4}
+        depthWrite={false}
+      />
+    </mesh>
+  )
+}
+
 interface SceneProps {
   points: number[][]
   robot: { x: number; y: number; heading_deg: number }
+  thermalGrid?: number[][] | null
+  thermalBounds?: [number, number, number, number] | null
+  occupancyGrid?: number[][] | null
+  occupancyBounds?: [number, number, number, number] | null
 }
 
-function Scene({ points, robot }: SceneProps) {
+function Scene({ points, robot, thermalGrid, thermalBounds, occupancyGrid, occupancyBounds }: SceneProps) {
   return (
     <>
       <ambientLight intensity={0.6} />
       <directionalLight position={[5, 5, 5]} intensity={0.8} />
+      <OccupancyGroundOverlay grid={occupancyGrid} bounds={occupancyBounds} />
+      <ThermalGroundOverlay grid={thermalGrid} bounds={thermalBounds} />
       <Robot x={robot.x} y={robot.y} heading_deg={robot.heading_deg} />
       <PointCloud points={points} />
       <OrbitControls enableDamping dampingFactor={0.05} />
@@ -131,7 +242,10 @@ function Scene({ points, robot }: SceneProps) {
 }
 
 export default function RobotScene() {
-  const { points, robot, action, connected, analytics, air_temp_c, humidity_pct } = useRobotData()
+  const {
+    points, robot, action, connected, analytics, air_temp_c, humidity_pct,
+    thermal_grid, thermal_grid_bounds, occupancy_grid, occupancy_bounds,
+  } = useRobotData()
 
   return (
     <div className="w-full h-full min-h-[400px] relative">
@@ -174,7 +288,14 @@ export default function RobotScene() {
         camera={{ position: [3, 2, 3], fov: 50 }}
         gl={{ antialias: true }}
       >
-        <Scene points={points} robot={robot} />
+        <Scene
+          points={points}
+          robot={robot}
+          thermalGrid={thermal_grid}
+          thermalBounds={thermal_grid_bounds ?? undefined}
+          occupancyGrid={occupancy_grid}
+          occupancyBounds={occupancy_bounds ?? undefined}
+        />
       </Canvas>
     </div>
   )

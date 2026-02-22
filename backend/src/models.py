@@ -1,12 +1,16 @@
 """Pydantic models for API request/response and WebSocket payloads."""
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, AliasChoices
 
 
 class ReadingPoint(BaseModel):
-    """Single polar reading from ultrasonic sensor."""
+    """Single polar reading from ultrasonic sensor (servo-sync)."""
     angle: float   # degrees, 0 = forward
-    distance: float  # cm
+    distance: float = Field(0.0, validation_alias=AliasChoices("distance", "dist"))  # cm
+    temp: float | None = None  # air_temp_c at read time
+    gyro_z: float | None = None  # yaw rate deg/s from IMU
+    accel_x: float | None = None
+    accel_y: float | None = None
 
 
 class ArduinoReadingsPayload(BaseModel):
@@ -55,3 +59,8 @@ class FrontendUpdate(BaseModel):
     analytics: dict | None = None              # {wasted_power_w, hot_zone_count, ...}
     air_temp_c: float | None = None            # DHT11 current air temp °C
     humidity_pct: float | None = None          # DHT11 current humidity %
+    occupancy_grid: list[list[float]] | None = None   # Probabilistic occupancy [0,1]
+    occupancy_bounds: tuple[float, float, float, float] | None = None  # x_min, x_max, y_min, y_max
+    thermal_grid: list[list[float]] | None = None     # IDW interpolated temps
+    thermal_grid_bounds: tuple[float, float, float, float] | None = None  # x_min, x_max, y_min, y_max
+    gyro_z: float | None = None                # Latest yaw rate deg/s (debug)

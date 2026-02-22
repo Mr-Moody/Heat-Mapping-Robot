@@ -5,8 +5,8 @@ Sketch that sweeps an ultrasonic sensor and sends readings to the Python backend
 ## Requirements
 
 - **Board:** Any (Arduino Uno, ESP32, etc.) — Serial mode works on all; WiFi needs ESP32
-- **Libraries:** ArduinoJson, DHT sensor library (install via Library Manager)
-- **Hardware:** HC-SR04 ultrasonic, 180° micro servo, DHT11 temp/humidity
+- **Libraries:** ArduinoJson, DHT sensor library; Modulino (optional, for IMU when `USE_IMU=1`)
+- **Hardware:** HC-SR04 ultrasonic, 180° micro servo, DHT11 temp/humidity; Modulino Movement (optional, I2C/Qwiic)
 
 ## Communication Modes
 
@@ -67,6 +67,12 @@ Before running the main sketch, calibrate `SERVO_AT_MIN` and `SERVO_AT_MAX`:
 - HC-SR04: VCC→5V, GND→GND, TRIG→5, ECHO→7
 - Servo: Signal→9, VCC→5V, GND→GND
 - DHT11: Data→8, VCC→5V, GND→GND (4.7kΩ pull-up on data to VCC). Run `dht_test/dht_test.ino` first to verify.
+- **Motors (USE_MOTORS=1):** L298N style — IN1→13, IN2→12 (Motor A), IN3→10, IN4→11 (Motor B). Same as `motor_test`.
+
+## Navigation Modes
+
+- **COMMAND_MODE=1 (default):** Backend drives navigation via probabilistic occupancy grid. Arduino receives F/B/L/R/S over serial and streams sensor data continuously. Ultrasonic used for mapping and obstacle avoidance; no valid-reading gate.
+- **COMMAND_MODE=0:** Legacy move–stop–sweep: move 20 cm, stop 2 s, sweep 180°, send, repeat.
 
 ## Data Flow
 

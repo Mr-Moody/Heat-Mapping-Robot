@@ -90,6 +90,9 @@ def run_serial_reader(
                     payload = ArduinoReadingsPayload(**data)
                     update = connection.receive_readings(payload)
                     update_queue.put(update.model_dump_json())
+                    cmd = connection.pop_pending_motor_cmd()
+                    if cmd:
+                        ser.write(cmd.encode() + b"\n")
                 except (json.JSONDecodeError, TypeError, ValueError) as e:
                     logger.debug("Serial parse error: %s", e)
                 except Exception as e:

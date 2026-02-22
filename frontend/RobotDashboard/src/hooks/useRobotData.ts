@@ -35,6 +35,11 @@ export interface RobotData {
   analytics?: AnalyticsSummary
   air_temp_c?: number | null
   humidity_pct?: number | null
+  occupancy_grid?: number[][] | null
+  occupancy_bounds?: [number, number, number, number] | null
+  thermal_grid?: number[][] | null
+  thermal_grid_bounds?: [number, number, number, number] | null
+  gyro_z?: number | null
 }
 
 const defaultRobot: RobotPose = { x: 0, y: 0, heading_deg: 0 }
@@ -72,6 +77,11 @@ export function useRobotData() {
             analytics: msg.analytics,
             air_temp_c: msg.air_temp_c ?? null,
             humidity_pct: msg.humidity_pct ?? null,
+            occupancy_grid: msg.occupancy_grid ?? null,
+            occupancy_bounds: msg.occupancy_bounds ?? null,
+            thermal_grid: msg.thermal_grid ?? null,
+            thermal_grid_bounds: msg.thermal_grid_bounds ?? null,
+            gyro_z: msg.gyro_z ?? null,
           })
         } catch {
           // Ignore parse errors
