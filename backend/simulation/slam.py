@@ -155,3 +155,24 @@ class OccupancyGrid:
                 if v != UNKNOWN:
                     out[f"{r},{c}"] = v
         return out
+
+    def get_occupancy_grid(self) -> list[list[float]]:
+        """Return 2D grid for frontend overlay. Row-major."""
+        return [row[:] for row in self._grid]
+
+    def get_occupancy_bounds(self) -> tuple[float, float, float, float]:
+        """Return (x_min, x_max, z_min, z_max) in world coords for overlay."""
+        res = self.resolution
+        return (0, self.cols * res, 0, self.rows * res)
+
+    def get_obstacle_points(self) -> list[list[float]]:
+        """Return list of [x, y, z] for occupied cells (obstacle point cloud)."""
+        res = self.resolution
+        points = []
+        for r in range(self.rows):
+            for c in range(self.cols):
+                if self._grid[r][c] >= 0.9:  # occupied
+                    x = (c + 0.5) * res
+                    z = (r + 0.5) * res
+                    points.append([x, 0.15, z])
+        return points

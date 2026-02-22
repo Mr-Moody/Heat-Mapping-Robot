@@ -29,7 +29,7 @@ export default function Alerts({ rooms }: AlertsProps) {
   if (alerts.length === 0) return null
 
   return (
-    <div className="bg-uber-white/90 border border-uber-gray-light rounded-lg p-4">
+    <div className="bg-uber-white/90 border border-uber-gray-light rounded-lg p-4 transition-transform duration-200 hover:scale-[1.01] hover:shadow-md origin-center">
       <h2 className="m-0 mb-3 text-base font-semibold text-uber-gray-dark">Alerts</h2>
       <ul className="m-0 list-disc pl-5">
         {alerts.map((a, i) => (

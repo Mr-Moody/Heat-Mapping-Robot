@@ -14,10 +14,10 @@ export default function HomePage() {
         </div>
         <div className="pt-8">
           <Link
-            to="/dashboard"
+            to="/live"
             className="inline-block bg-[var(--accent-cyan)] text-uber-black px-8 py-3 text-sm font-medium rounded-sm hover:opacity-90 transition-opacity"
           >
-            Open Dashboard
+            Open ThermalScout
           </Link>
         </div>
       </div>

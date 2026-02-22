@@ -109,3 +109,21 @@ class Floorplan:
         r = fine_row // subdiv
         c = fine_col // subdiv
         return self.is_traversable(r, c)
+
+    def raycast(self, ox: float, oy: float, theta: float, max_dist: float = 20.0) -> float | None:
+        """Cast a ray from (ox, oy) in direction theta (radians). Returns distance to first
+        non-traversable cell, or None if no hit within max_dist. Uses DDA-style stepping."""
+        import math
+        step = 0.05
+        dx = math.cos(theta) * step
+        dy = math.sin(theta) * step
+        x, y = ox, oy
+        d = 0.0
+        while d < max_dist:
+            row, col = self.world_to_cell(x, y)
+            if not self.is_traversable(row, col):
+                return d
+            x += dx
+            y += dy
+            d += step
+        return None

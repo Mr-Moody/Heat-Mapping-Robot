@@ -5,6 +5,8 @@ built and avoided via SLAM from sensor data.
 """
 import time
 import asyncio
+import math
+import random
 from dataclasses import dataclass
 from .floorplan import Floorplan
 from .robot import Robot
@@ -112,6 +114,33 @@ class SimulationEngine:
 
     def get_grid(self) -> list[list[int]]:
         return self.floorplan.grid
+
+    def get_simulated_point_cloud(
+        self,
+        num_rays: int = 72,
+        max_range: float = 8.0,
+        dist_noise_std: float = 0.03,
+        angle_noise_std: float = 0.008,
+        height_noise_std: float = 0.01,
+    ) -> list[list[float]]:
+        """Simulate a 2D LIDAR-style point cloud from the current robot pose.
+        Returns list of [x, y, z] in world coords (y = height above floor, small noise).
+        Adds Gaussian noise to distance, angle, and height for realism."""
+        points: list[list[float]] = []
+        x0, y0 = self.robot.x, self.robot.y
+        theta0 = self.robot.theta
+        for i in range(num_rays):
+            angle = 2 * math.pi * i / num_rays + random.gauss(0, angle_noise_std)
+            ray_angle = theta0 + angle
+            dist = self.floorplan.raycast(x0, y0, ray_angle, max_range)
+            if dist is None:
+                continue
+            dist_noisy = max(0.05, dist + random.gauss(0, dist_noise_std))
+            wx = x0 + math.cos(ray_angle) * dist_noisy
+            wy = y0 + math.sin(ray_angle) * dist_noisy
+            h = 0.02 + random.gauss(0, height_noise_std)
+            points.append([wx, h, wy])
+        return points
 
     async def run_loop(self):
         self._running = True

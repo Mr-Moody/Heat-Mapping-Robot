@@ -166,6 +166,56 @@ interface HeatmapPoint {
   color: number
 }
 
+interface ObstaclePointCloudProps {
+  points: number[][]
+}
+
+function ObstaclePointCloud({ points }: ObstaclePointCloudProps) {
+  if (!points || points.length === 0) return null
+  const positions = useMemo(() => {
+    const arr = new Float32Array(points.length * 3)
+    points.forEach((p, i) => {
+      arr[i * 3] = p[0]
+      arr[i * 3 + 1] = p[1]
+      arr[i * 3 + 2] = p[2]
+    })
+    return arr
+  }, [points])
+  return (
+    <points>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+      </bufferGeometry>
+      <pointsMaterial size={0.08} color="#ff6b6b" sizeAttenuation />
+    </points>
+  )
+}
+
+interface SimulatedPointCloudProps {
+  points: number[][]
+}
+
+function SimulatedPointCloud({ points }: SimulatedPointCloudProps) {
+  if (!points || points.length === 0) return null
+  const positions = useMemo(() => {
+    const arr = new Float32Array(points.length * 3)
+    points.forEach((p, i) => {
+      arr[i * 3] = p[0]
+      arr[i * 3 + 1] = p[1]
+      arr[i * 3 + 2] = p[2]
+    })
+    return arr
+  }, [points])
+  return (
+    <points>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+      </bufferGeometry>
+      <pointsMaterial size={0.06} color="#00d4aa" sizeAttenuation opacity={0.85} transparent />
+    </points>
+  )
+}
+
 interface ThermalPointCloudProps {
   heatmapPoints: HeatmapPoint[]
 }
@@ -203,9 +253,11 @@ interface Scene3DProps {
   heatmapRows: number
   heatmapCols: number
   heatmapCells: Record<string, number>
+  obstaclePoints: number[][]
+  pointCloud: number[][]
 }
 
-function Scene3D({ state, trail, grid, rows, cols, heatmapRows, heatmapCols, heatmapCells = {} }: Scene3DProps) {
+function Scene3D({ state, trail, grid, rows, cols, heatmapRows, heatmapCols, heatmapCells = {}, obstaclePoints = [], pointCloud = [] }: Scene3DProps) {
   const heatmapPoints = useMemo(() => {
     const pts: HeatmapPoint[] = []
     if (!trail || trail.length === 0) return pts
@@ -262,6 +314,8 @@ function Scene3D({ state, trail, grid, rows, cols, heatmapRows, heatmapCols, hea
       <Robot3D x={robotPos.x} y={robotPos.y} theta={robotPos.theta ?? 0} />
       <TrailLine trail={trail} />
       <ThermalPointCloud heatmapPoints={heatmapPoints} />
+      <SimulatedPointCloud points={pointCloud} />
+      <ObstaclePointCloud points={obstaclePoints} />
       <OrbitControls
         enableDamping
         dampingFactor={0.05}
@@ -289,6 +343,8 @@ interface RobotScene3DProps {
   heatmapRows?: number
   heatmapCols?: number
   heatmapCells?: Record<string, number>
+  obstaclePoints?: number[][]
+  pointCloud?: number[][]
   connected?: boolean
 }
 
@@ -301,6 +357,8 @@ export default function RobotScene3D({
   heatmapRows = 0,
   heatmapCols = 0,
   heatmapCells = {},
+  obstaclePoints = [],
+  pointCloud = [],
   connected,
 }: RobotScene3DProps) {
   const r = rows || 9
@@ -318,10 +376,26 @@ export default function RobotScene3D({
         </div>
       )}
       {state && (
-        <div className="absolute bottom-3 left-3 z-10 flex gap-4 text-xs font-mono text-cyan-400 bg-[rgba(26,35,50,0.9)] py-1.5 px-2.5 rounded">
-          <span>Ultrasonic: {state.ultrasonic_distance_cm?.toFixed(0) ?? '—'} cm</span>
-          <span>Temp: {state.temperature_c?.toFixed(1) ?? '—'} °C</span>
-          <span>Humidity: {state.humidity_percent?.toFixed(0) ?? '—'} %</span>
+        <div className="absolute bottom-3 left-3 z-10 flex flex-col gap-2">
+          <div className="flex gap-4 text-xs font-mono text-cyan-400 bg-[rgba(26,35,50,0.9)] py-1.5 px-2.5 rounded">
+            <span>Ultrasonic: {state.ultrasonic_distance_cm?.toFixed(0) ?? '—'} cm</span>
+            <span>Temp: {state.temperature_c?.toFixed(1) ?? '—'} °C</span>
+            <span>Humidity: {state.humidity_percent?.toFixed(0) ?? '—'} %</span>
+          </div>
+          <div className="flex flex-col gap-1">
+            {pointCloud.length > 0 && (
+              <div className="text-xs text-uber-gray-mid bg-[rgba(26,35,50,0.9)] py-1 px-2 rounded flex items-center gap-1.5">
+                <span className="inline-block w-2 h-2 rounded-full bg-[#00d4aa]" />
+                Scan ({pointCloud.length})
+              </div>
+            )}
+            {obstaclePoints.length > 0 && (
+              <div className="text-xs text-uber-gray-mid bg-[rgba(26,35,50,0.9)] py-1 px-2 rounded flex items-center gap-1.5">
+                <span className="inline-block w-2 h-2 rounded-full bg-[#ff6b6b]" />
+                SLAM obstacles ({obstaclePoints.length})
+              </div>
+            )}
+          </div>
         </div>
       )}
       <Canvas
@@ -337,6 +411,8 @@ export default function RobotScene3D({
           heatmapRows={heatmapRows}
           heatmapCols={heatmapCols}
           heatmapCells={heatmapCells}
+          obstaclePoints={obstaclePoints}
+          pointCloud={pointCloud}
         />
       </Canvas>
     </div>

@@ -37,8 +37,25 @@ export default function LiveDashboardPage() {
   const [heatmapCells, setHeatmapCells] = useState<Record<string, number>>({})
   const [heatmapRows, setHeatmapRows] = useState(0)
   const [heatmapCols, setHeatmapCols] = useState(0)
+  const [obstaclePoints, setObstaclePoints] = useState<number[][]>([])
+  const [pointCloud, setPointCloud] = useState<number[][]>([])
   const [connected, setConnected] = useState(false)
   const [viewMode, setViewMode] = useState<'2d' | '3d'>('3d')
+  const [liveOpacity, setLiveOpacity] = useState(1)
+
+  useEffect(() => {
+    if (!connected) return
+    let rafId: number
+    const start = performance.now()
+    const tick = () => {
+      const t = (performance.now() - start) / 1000
+      const opacity = 0.4 + 0.6 * (1 + Math.sin(t * 2.5)) / 2
+      setLiveOpacity(opacity)
+      rafId = requestAnimationFrame(tick)
+    }
+    rafId = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(rafId)
+  }, [connected])
 
   useEffect(() => {
     const ws = new WebSocket(WS_URL + '/ws/live')
@@ -54,6 +71,8 @@ export default function LiveDashboardPage() {
           if (data.heatmap_cells) setHeatmapCells(data.heatmap_cells)
           if (data.heatmap_rows != null) setHeatmapRows(data.heatmap_rows)
           if (data.heatmap_cols != null) setHeatmapCols(data.heatmap_cols)
+          if (Array.isArray(data.obstacle_points)) setObstaclePoints(data.obstacle_points)
+          if (Array.isArray(data.point_cloud)) setPointCloud(data.point_cloud)
         } else if (data.position) {
           setState(data)
         } else {
@@ -70,7 +89,7 @@ export default function LiveDashboardPage() {
     const fetchData = () => {
       fetch('/api/map')
         .then((r) => r.json())
-        .then((d: { grid?: number[][]; rows?: number; cols?: number; trail?: [number, number][]; heatmap_cells?: Record<string, number>; heatmap_rows?: number; heatmap_cols?: number }) => {
+        .then((d: { grid?: number[][]; rows?: number; cols?: number; trail?: [number, number][]; heatmap_cells?: Record<string, number>; heatmap_rows?: number; heatmap_cols?: number; obstacle_points?: number[][]; point_cloud?: number[][] }) => {
           setGrid(d.grid || [])
           setRows(d.rows || 0)
           setCols(d.cols || 0)
@@ -78,6 +97,8 @@ export default function LiveDashboardPage() {
           if (d.heatmap_cells) setHeatmapCells(d.heatmap_cells)
           if (d.heatmap_rows != null) setHeatmapRows(d.heatmap_rows)
           if (d.heatmap_cols != null) setHeatmapCols(d.heatmap_cols)
+          if (Array.isArray(d.obstacle_points)) setObstaclePoints(d.obstacle_points)
+          if (Array.isArray(d.point_cloud)) setPointCloud(d.point_cloud)
         })
         .catch(() => {})
       if (!connected) {
@@ -105,8 +126,15 @@ export default function LiveDashboardPage() {
       <header className="px-4 sm:px-6 py-4 bg-[#1a2332] border-b border-[#30363d] flex flex-wrap items-center gap-4">
         <h1 className="m-0 text-xl font-bold text-cyan-400">ThermalScout</h1>
         <span className="text-sm text-uber-gray-mid">Autonomous Radiator Thermal Mapping</span>
-        <div className={`ml-auto font-mono text-sm ${connected ? 'text-cyan-400' : 'text-uber-gray-mid'}`}>
-          {connected ? '● LIVE' : '○ Disconnected'}
+        <div className={`ml-auto font-mono text-sm flex items-center gap-1.5 ${connected ? 'text-cyan-400' : 'text-uber-gray-mid'}`}>
+          {connected ? (
+            <>
+              <span className="inline-block" style={{ opacity: liveOpacity }}>●</span>
+              <span>LIVE</span>
+            </>
+          ) : (
+            '○ Disconnected'
+          )}
         </div>
       </header>
 
@@ -161,6 +189,8 @@ export default function LiveDashboardPage() {
                   heatmapRows={heatmapRows}
                   heatmapCols={heatmapCols}
                   heatmapCells={heatmapCells}
+                  obstaclePoints={obstaclePoints}
+                  pointCloud={pointCloud}
                   connected={connected}
                 />
               </div>

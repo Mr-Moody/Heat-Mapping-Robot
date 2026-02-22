@@ -64,10 +64,16 @@ def get_rooms():
 
 @app.get("/api/map")
 def get_map():
-    """Floorplan grid, trail, and per-cell heatmap for visualization."""
+    """Floorplan grid, trail, heatmap, and SLAM occupancy for visualization."""
     if not engine:
-        return {"grid": [], "trail": [], "heatmap_cells": {}, "heatmap_rows": 0, "heatmap_cols": 0}
+        return {
+            "grid": [], "trail": [], "heatmap_cells": {}, "heatmap_rows": 0, "heatmap_cols": 0,
+            "occupancy_grid": None, "occupancy_bounds": None, "obstacle_points": [],
+            "point_cloud": [],
+        }
     hr, hc = engine.get_heatmap_shape()
+    slam = engine.slam
+    occ_bounds = slam.get_occupancy_bounds()
     return {
         "grid": engine.get_grid(),
         "trail": engine.get_trail(),
@@ -76,6 +82,10 @@ def get_map():
         "cols": engine.floorplan.cols,
         "heatmap_rows": hr,
         "heatmap_cols": hc,
+        "occupancy_grid": slam.get_occupancy_grid(),
+        "occupancy_bounds": list(occ_bounds),
+        "obstacle_points": slam.get_obstacle_points(),
+        "point_cloud": engine.get_simulated_point_cloud(),
     }
 
 
@@ -94,6 +104,7 @@ async def websocket_live(ws: WebSocket):
             heatmap = engine.get_heatmap_data()
             rooms = compute_room_analytics(heatmap, grid, heatmap_subdiv=4)
             hr, hc = engine.get_heatmap_shape()
+            slam = engine.slam
             await ws.send_json({
                 "type": "analytics",
                 "rooms": rooms,
@@ -101,6 +112,10 @@ async def websocket_live(ws: WebSocket):
                 "heatmap_cells": engine.get_heatmap_cells(),
                 "heatmap_rows": hr,
                 "heatmap_cols": hc,
+                "occupancy_grid": slam.get_occupancy_grid(),
+                "occupancy_bounds": list(slam.get_occupancy_bounds()),
+                "obstacle_points": slam.get_obstacle_points(),
+                "point_cloud": engine.get_simulated_point_cloud(),
             })
             await asyncio.sleep(0.15)
     except WebSocketDisconnect:
