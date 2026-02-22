@@ -365,7 +365,7 @@ export default function RobotScene3D({
   const c = cols || 19
   return (
     <div className="relative w-full h-[450px] min-h-[450px] bg-[#0f1419] [&_canvas]:block [&_canvas]:w-full [&_canvas]:h-full [&_canvas]:min-h-[450px]">
-      {!connected && (
+      {!connected && !state?.position && (
         <div className="absolute top-3 left-3 right-3 z-10 text-center text-sm text-uber-gray-mid bg-[rgba(26,35,50,0.9)] py-2 px-3 rounded">
           Connecting...
         </div>

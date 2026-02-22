@@ -4,6 +4,7 @@ import RobotScene3D from '../components/RobotScene3D'
 import AnalyticsPanel from '../components/AnalyticsPanel'
 import Alerts from '../components/Alerts'
 import SensorReadout from '../components/SensorReadout'
+import DashboardSkeleton from '../components/DashboardSkeleton'
 
 const WS_URL =
   (location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + location.host
@@ -40,8 +41,14 @@ export default function LiveDashboardPage() {
   const [obstaclePoints, setObstaclePoints] = useState<number[][]>([])
   const [pointCloud, setPointCloud] = useState<number[][]>([])
   const [connected, setConnected] = useState(false)
+  const [hasData, setHasData] = useState(false)
   const [viewMode, setViewMode] = useState<'2d' | '3d'>('3d')
   const [liveOpacity, setLiveOpacity] = useState(1)
+
+  useEffect(() => {
+    const ready = connected || grid.length > 0 || (state?.position != null) || rooms.length > 0
+    setHasData(ready)
+  }, [connected, grid.length, state?.position, rooms.length])
 
   useEffect(() => {
     if (!connected) return
@@ -86,7 +93,7 @@ export default function LiveDashboardPage() {
   }, [])
 
   useEffect(() => {
-    const fetchData = () => {
+    const fetchMap = () =>
       fetch('/api/map')
         .then((r) => r.json())
         .then((d: { grid?: number[][]; rows?: number; cols?: number; trail?: [number, number][]; heatmap_cells?: Record<string, number>; heatmap_rows?: number; heatmap_cols?: number; obstacle_points?: number[][]; point_cloud?: number[][] }) => {
@@ -101,23 +108,36 @@ export default function LiveDashboardPage() {
           if (Array.isArray(d.point_cloud)) setPointCloud(d.point_cloud)
         })
         .catch(() => {})
+
+    const fetchCurrent = () =>
+      fetch('/api/current')
+        .then((r) => r.json())
+        .then((d: { position?: { x: number; y: number; theta?: number }; ultrasonic_distance_cm?: number }) => {
+          if (d.position != null || d.ultrasonic_distance_cm != null) setState(d)
+        })
+        .catch(() => {})
+
+    const fetchRooms = () =>
+      fetch('/api/rooms')
+        .then((r) => r.json())
+        .then((d: { rooms?: RoomAnalytics[] }) => {
+          if (d.rooms?.length) setRooms(d.rooms)
+        })
+        .catch(() => {})
+
+    // Fire all three in parallel for faster initial load
+    fetchMap()
+    fetchCurrent()
+    fetchRooms()
+
+    const interval = connected ? 2000 : 500
+    const id = setInterval(() => {
+      fetchMap()
       if (!connected) {
-        fetch('/api/current')
-          .then((r) => r.json())
-          .then((d: { position?: { x: number; y: number; theta?: number } }) => {
-            if (d.position) setState(d)
-          })
-          .catch(() => {})
-        fetch('/api/rooms')
-          .then((r) => r.json())
-          .then((d: { rooms?: RoomAnalytics[] }) => {
-            if (d.rooms?.length) setRooms(d.rooms)
-          })
-          .catch(() => {})
+        fetchCurrent()
+        fetchRooms()
       }
-    }
-    fetchData()
-    const id = setInterval(fetchData, 400)
+    }, interval)
     return () => clearInterval(id)
   }, [connected])
 
@@ -126,84 +146,88 @@ export default function LiveDashboardPage() {
       <header className="px-4 sm:px-6 py-4 bg-[#1a2332] border-b border-[#30363d] flex flex-wrap items-center gap-4">
         <h1 className="m-0 text-xl font-bold text-cyan-400">ThermalScout</h1>
         <span className="text-sm text-uber-gray-mid">Autonomous Radiator Thermal Mapping</span>
-        <div className={`ml-auto font-mono text-sm flex items-center gap-1.5 ${connected ? 'text-cyan-400' : 'text-uber-gray-mid'}`}>
-          {connected ? (
+        <div className={`ml-auto font-mono text-sm flex items-center gap-1.5 ${hasData ? 'text-cyan-400' : 'text-uber-gray-mid'}`}>
+          {hasData ? (
             <>
-              <span className="inline-block" style={{ opacity: liveOpacity }}>●</span>
-              <span>LIVE</span>
+              <span className="inline-block" style={{ opacity: connected ? liveOpacity : 1 }}>●</span>
+              <span>{connected ? 'LIVE' : 'Live (polling)'}</span>
             </>
           ) : (
-            '○ Disconnected'
+            '○ Connecting...'
           )}
         </div>
       </header>
 
-      <main className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4 p-4 overflow-visible">
-        <section className="relative z-0 bg-[#1a2332] rounded-lg border border-[#30363d] overflow-hidden min-h-[400px] flex flex-col">
-          <div className="flex gap-0 p-1 pt-1 pr-1 pl-1 pb-0 bg-[#243044] border-b border-[#30363d]">
-            <button
-              type="button"
-              className={`flex-1 py-2 px-3 text-sm font-medium border-none rounded-t-lg transition-all duration-150 cursor-pointer ${
-                viewMode === '2d'
-                  ? 'bg-[#1a2332] text-cyan-400'
-                  : 'bg-transparent text-uber-gray-mid hover:text-uber-gray-dark'
-              }`}
-              onClick={() => setViewMode('2d')}
-            >
-              2D Map
-            </button>
-            <button
-              type="button"
-              className={`flex-1 py-2 px-3 text-sm font-medium border-none rounded-t-lg transition-all duration-150 cursor-pointer ${
-                viewMode === '3d'
-                  ? 'bg-[#1a2332] text-cyan-400'
-                  : 'bg-transparent text-uber-gray-mid hover:text-uber-gray-dark'
-              }`}
-              onClick={() => setViewMode('3d')}
-            >
-              3D Robot
-            </button>
-          </div>
-          <div className="flex-1 min-h-[450px] flex flex-col">
-            {viewMode === '2d' ? (
-              <div className="flex-1">
-                <LiveMap
-                  grid={grid}
-                  rows={rows}
-                  cols={cols}
-                  heatmapRows={heatmapRows}
-                  heatmapCols={heatmapCols}
-                  state={state}
-                  trail={trail}
-                  heatmapCells={heatmapCells}
-                />
-              </div>
-            ) : (
-              <div className="flex-1 min-h-[450px]">
-                <RobotScene3D
-                  state={state}
-                  trail={trail}
-                  grid={grid}
-                  rows={rows}
-                  cols={cols}
-                  heatmapRows={heatmapRows}
-                  heatmapCols={heatmapCols}
-                  heatmapCells={heatmapCells}
-                  obstaclePoints={obstaclePoints}
-                  pointCloud={pointCloud}
-                  connected={connected}
-                />
-              </div>
-            )}
-          </div>
-        </section>
+      {hasData ? (
+        <main className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4 p-4 overflow-visible animate-fade-slide">
+          <section className="relative z-0 bg-[#1a2332] rounded-lg border border-[#30363d] overflow-hidden min-h-[400px] flex flex-col">
+            <div className="flex gap-0 p-1 pt-1 pr-1 pl-1 pb-0 bg-[#243044] border-b border-[#30363d]">
+              <button
+                type="button"
+                className={`flex-1 py-2 px-3 text-sm font-medium border-none rounded-t-lg transition-all duration-150 cursor-pointer ${
+                  viewMode === '2d'
+                    ? 'bg-[#1a2332] text-cyan-400'
+                    : 'bg-transparent text-uber-gray-mid hover:text-uber-gray-dark'
+                }`}
+                onClick={() => setViewMode('2d')}
+              >
+                2D Map
+              </button>
+              <button
+                type="button"
+                className={`flex-1 py-2 px-3 text-sm font-medium border-none rounded-t-lg transition-all duration-150 cursor-pointer ${
+                  viewMode === '3d'
+                    ? 'bg-[#1a2332] text-cyan-400'
+                    : 'bg-transparent text-uber-gray-mid hover:text-uber-gray-dark'
+                }`}
+                onClick={() => setViewMode('3d')}
+              >
+                3D Robot
+              </button>
+            </div>
+            <div className="flex-1 min-h-[450px] flex flex-col">
+              {viewMode === '2d' ? (
+                <div className="flex-1">
+                  <LiveMap
+                    grid={grid}
+                    rows={rows}
+                    cols={cols}
+                    heatmapRows={heatmapRows}
+                    heatmapCols={heatmapCols}
+                    state={state}
+                    trail={trail}
+                    heatmapCells={heatmapCells}
+                  />
+                </div>
+              ) : (
+                <div className="flex-1 min-h-[450px]">
+                  <RobotScene3D
+                    state={state}
+                    trail={trail}
+                    grid={grid}
+                    rows={rows}
+                    cols={cols}
+                    heatmapRows={heatmapRows}
+                    heatmapCols={heatmapCols}
+                    heatmapCells={heatmapCells}
+                    obstaclePoints={obstaclePoints}
+                    pointCloud={pointCloud}
+                    connected={connected}
+                  />
+                </div>
+              )}
+            </div>
+          </section>
 
-        <aside className="relative z-10 flex flex-col gap-4 overflow-y-auto overflow-x-hidden min-w-0 shrink-0 px-2 py-1">
-          <SensorReadout state={state} />
-          <AnalyticsPanel rooms={rooms} />
-          <Alerts rooms={rooms} />
-        </aside>
-      </main>
+          <aside className="relative z-10 flex flex-col gap-4 overflow-y-auto overflow-x-hidden min-w-0 shrink-0 px-2 py-1">
+            <SensorReadout state={state} />
+            <AnalyticsPanel rooms={rooms} />
+            <Alerts rooms={rooms} />
+          </aside>
+        </main>
+      ) : (
+        <DashboardSkeleton />
+      )}
     </div>
   )
 }
