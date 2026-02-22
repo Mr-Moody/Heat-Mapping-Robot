@@ -1,6 +1,7 @@
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useMemo } from 'react'
 import * as THREE from 'three'
+import { tempToColorHex } from '../utils/heatmapColors'
 
 function CameraLookAt({ target }: { target: [number, number, number] }) {
   const { camera } = useThree()
@@ -8,35 +9,6 @@ function CameraLookAt({ target }: { target: [number, number, number] }) {
     camera.lookAt(new THREE.Vector3(...target))
   })
   return null
-}
-function tempToColorHex(temp: number): number {
-  const tMin = 14
-  const tMax = 23
-  const t = Math.max(tMin, Math.min(tMax, temp))
-  const x = (t - tMin) / (tMax - tMin)
-  let r: number, g: number, b: number
-  if (x <= 0.35) {
-    const s = x / 0.35
-    r = Math.round(40 + (60 - 40) * s)
-    g = Math.round(100 + (180 - 100) * s)
-    b = Math.round(200 + (140 - 200) * s)
-  } else if (x <= 0.6) {
-    const s = (x - 0.35) / 0.25
-    r = Math.round(60 + (140 - 60) * s)
-    g = Math.round(180 + (220 - 180) * s)
-    b = Math.round(140 + (80 - 140) * s)
-  } else if (x <= 0.85) {
-    const s = (x - 0.6) / 0.25
-    r = Math.round(140 + (255 - 140) * s)
-    g = Math.round(220 + (200 - 220) * s)
-    b = Math.round(80 + (50 - 80) * s)
-  } else {
-    const s = (x - 0.85) / 0.15
-    r = 255
-    g = Math.round(200 + (80 - 200) * s)
-    b = Math.round(50 + (40 - 50) * s)
-  }
-  return (r << 16) | (g << 8) | b
 }
 
 const UNEXPLORED = 0x283240
