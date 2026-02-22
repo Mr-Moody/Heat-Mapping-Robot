@@ -5,7 +5,7 @@ import * as THREE from 'three'
 import { useRobotData } from '../hooks/useRobotData'
 
 // Robot model: 1/2 scale, units in metres (matches point cloud: distance_cm/100)
-const SCALE = 0.5
+const SCALE = 0.25
 const wheelRadius = 0.16 * SCALE
 const wheelWidth = 0.08 * SCALE
 const casterRadius = 0.06 * SCALE
@@ -131,7 +131,7 @@ function Scene({ points, robot }: SceneProps) {
 }
 
 export default function RobotScene() {
-  const { points, robot, action, connected, analytics } = useRobotData()
+  const { points, robot, action, connected, analytics, air_temp_c, humidity_pct } = useRobotData()
 
   return (
     <div className="w-full h-full min-h-[400px] relative">
@@ -147,12 +147,22 @@ export default function RobotScene() {
       )}
       {connected && points.length > 0 && (
         <>
-          <div className="absolute top-4 left-4 z-10 text-xs text-uber-gray-mid bg-uber-white/80 px-2 py-1 rounded">
-            {action}
+          <div className="absolute top-4 left-4 z-10 text-xs text-uber-gray-mid bg-uber-white/80 px-2 py-1 rounded space-y-1">
+            <div>{action}</div>
+            {(air_temp_c != null || humidity_pct != null) && (
+              <div className="text-uber-gray-dark">
+                {air_temp_c != null && <span>{air_temp_c.toFixed(1)}°C</span>}
+                {air_temp_c != null && humidity_pct != null && ' · '}
+                {humidity_pct != null && <span>{humidity_pct.toFixed(0)}% RH</span>}
+              </div>
+            )}
           </div>
           {analytics && (
             <div className="absolute top-4 right-4 z-10 text-xs bg-uber-white/90 px-2 py-1.5 rounded shadow-sm">
               <div className="font-medium text-uber-gray-dark">Thermal analytics</div>
+              <div>
+                Current: {air_temp_c != null ? `${air_temp_c.toFixed(1)}°C` : '— (run dht_test to verify sensor)'}
+              </div>
               <div>Wasted: {analytics.wasted_power_w.toFixed(0)} W</div>
               <div>Hot zones: {analytics.hot_zone_count}</div>
               <div>Max: {analytics.max_temp_c.toFixed(1)}°C | Avg: {analytics.avg_temp_c.toFixed(1)}°C</div>

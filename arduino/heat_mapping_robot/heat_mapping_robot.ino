@@ -8,6 +8,7 @@
  * Hardware:
  *   - HC-SR04 ultrasonic: TRIG_PIN, ECHO_PIN
  *   - 180° micro servo: SERVO_PIN (positional)
+ *   - DHT11 temp/humidity: DHT_PIN (data)
  */
 
 #define USE_SERIAL 1   // 1 = USB serial, 0 = WiFi
@@ -17,6 +18,7 @@
 #include <HTTPClient.h>
 #endif
 #include <ArduinoJson.h>
+#include <DHT.h>
 #include <Servo.h>
 
 // ── CONFIG ────────────────────────────────────────────────────────────────
@@ -36,6 +38,7 @@
 #define TRIG_PIN        5
 #define ECHO_PIN        7
 #define SERVO_PIN      9
+#define DHT_PIN         8
 #define MAX_DISTANCE_CM 400
 #define MIN_DISTANCE_CM 2
 // Distance calibration: run distance_calibrate.ino to tune. 58.2 = standard HC-SR04.
@@ -52,7 +55,12 @@ int bufferIdx = 0;
 float currentAngle = 0.0;
 bool sweepDirection = true;  // true = CW
 unsigned long startTimeMs = 0;
+unsigned long lastDhtReadMs = 0;
+float lastTempC = NAN;
+float lastHumPct = NAN;
 Servo sweepServo;
+DHT dht(DHT_PIN, DHT11);
+#define DHT_READ_INTERVAL_MS 2000
 
 // ── ULTRASONIC ────────────────────────────────────────────────────────────
 float readDistanceCm()
@@ -96,8 +104,19 @@ void stepServo() {
 
 // ── SEND READINGS (Serial or WiFi) ────────────────────────────────────────
 bool sendReadings(Reading* readings, int count) {
-  StaticJsonDocument<768> doc;  // 18 readings need ~600 bytes
+  StaticJsonDocument<768> doc;  // readings + thermal
   doc["timestamp_ms"] = (long)(millis() - startTimeMs);
+
+  unsigned long now = millis();
+  if (now - lastDhtReadMs >= DHT_READ_INTERVAL_MS) {
+    lastDhtReadMs = now;
+    float t = dht.readTemperature();
+    float h = dht.readHumidity();
+    if (!isnan(t)) lastTempC = t;
+    if (!isnan(h)) lastHumPct = h;
+  }
+  if (!isnan(lastTempC)) doc["air_temp_c"] = round(lastTempC * 10) / 10.0;
+  if (!isnan(lastHumPct)) doc["humidity_pct"] = round(lastHumPct * 10) / 10.0;
 
   JsonArray arr = doc.createNestedArray("readings");
 
@@ -135,6 +154,8 @@ void setup() {
   pinMode(TRIG_PIN, OUTPUT);
   pinMode(ECHO_PIN, INPUT);
 
+  dht.begin();
+  delay(2000);  // DHT11 needs 1–2 s to stabilize
   sweepServo.attach(SERVO_PIN);
   currentAngle = 0.0;
   sweepDirection = true;

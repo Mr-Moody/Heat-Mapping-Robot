@@ -33,6 +33,8 @@ export interface RobotData {
   sweep_cm: number[]
   thermal_points?: ThermalPoint[]
   analytics?: AnalyticsSummary
+  air_temp_c?: number | null
+  humidity_pct?: number | null
 }
 
 const defaultRobot: RobotPose = { x: 0, y: 0, heading_deg: 0 }
@@ -68,6 +70,8 @@ export function useRobotData() {
             sweep_cm: msg.sweep_cm ?? [],
             thermal_points: msg.thermal_points ?? [],
             analytics: msg.analytics,
+            air_temp_c: msg.air_temp_c ?? null,
+            humidity_pct: msg.humidity_pct ?? null,
           })
         } catch {
           // Ignore parse errors

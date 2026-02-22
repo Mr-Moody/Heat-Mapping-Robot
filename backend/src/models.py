@@ -53,3 +53,5 @@ class FrontendUpdate(BaseModel):
     sweep_cm: list[float]  # 12 distances for path planner compatibility
     thermal_points: list[dict] | None = None   # For heat map: [{x_m, y_m, surface_temp_c, ...}]
     analytics: dict | None = None              # {wasted_power_w, hot_zone_count, ...}
+    air_temp_c: float | None = None            # DHT11 current air temp °C
+    humidity_pct: float | None = None          # DHT11 current humidity %

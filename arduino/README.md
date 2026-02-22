@@ -5,8 +5,8 @@ Sketch that sweeps an ultrasonic sensor and sends readings to the Python backend
 ## Requirements
 
 - **Board:** Any (Arduino Uno, ESP32, etc.) — Serial mode works on all; WiFi needs ESP32
-- **Libraries:** ArduinoJson (install via Library Manager)
-- **Hardware:** HC-SR04 ultrasonic, 180° micro servo
+- **Libraries:** ArduinoJson, DHT sensor library (install via Library Manager)
+- **Hardware:** HC-SR04 ultrasonic, 180° micro servo, DHT11 temp/humidity
 
 ## Communication Modes
 
@@ -57,15 +57,16 @@ Before running the main sketch, calibrate `SERVO_AT_MIN` and `SERVO_AT_MAX`:
 2. Install **ArduinoJson** (Sketch → Include Library → Manage Libraries)
 3. Set `USE_SERIAL` (1 for USB, 0 for WiFi)
 4. If WiFi: edit `WIFI_SSID`, `WIFI_PASSWORD`, `BACKEND_URL`
-5. Set correct pins: `TRIG_PIN`, `ECHO_PIN`, `SERVO_PIN`
+5. Set correct pins: `TRIG_PIN`, `ECHO_PIN`, `SERVO_PIN`, `DHT_PIN` (default 8)
 6. Copy `SERVO_AT_MIN` and `SERVO_AT_MAX` from servo calibration
 7. Copy `MICROSEC_PER_CM` and `DISTANCE_OFFSET_CM` from distance calibration (if tuned)
 8. Upload
 
 ## Wiring
 
-- HC-SR04: VCC→5V, GND→GND, TRIG→GPIO5, ECHO→GPIO18
-- Servo: Signal→GPIO13, VCC→5V, GND→GND
+- HC-SR04: VCC→5V, GND→GND, TRIG→5, ECHO→7
+- Servo: Signal→9, VCC→5V, GND→GND
+- DHT11: Data→8, VCC→5V, GND→GND (4.7kΩ pull-up on data to VCC). Run `dht_test/dht_test.ino` first to verify.
 
 ## Data Flow
 

@@ -60,6 +60,8 @@ class ArduinoConnection():
         self.last_action = "IDLE"
         self._timestamp_ms = 0
         self.thermal_history: list[ThermalReading] = []
+        self.last_air_temp_c: float | None = None
+        self.last_humidity_pct: float | None = None
 
     def receive_readings(self, payload: ArduinoReadingsPayload) -> FrontendUpdate:
         """
@@ -91,6 +93,12 @@ class ArduinoConnection():
         self.point_cloud = add_to_ring_buffer(
             self.point_cloud, new_points, MAX_POINT_CLOUD_SIZE
         )
+
+        # Store latest DHT readings for frontend
+        if payload.air_temp_c is not None:
+            self.last_air_temp_c = payload.air_temp_c
+        if payload.humidity_pct is not None:
+            self.last_humidity_pct = payload.humidity_pct
 
         # Build SensorReading for path planner (use thermal from payload if present)
         forward_cm = sweep_cm[0]
@@ -140,7 +148,6 @@ class ArduinoConnection():
         analytics = compute_analytics(self.thermal_history)
         thermal_points = thermal_to_frontend_points(self.thermal_history)
         display_points = self.point_cloud[-DISPLAY_POINT_LIMIT:]
-
         return FrontendUpdate(
             points=display_points,
             robot=RobotPose(
@@ -152,6 +159,8 @@ class ArduinoConnection():
             sweep_cm=sweep_cm,
             thermal_points=thermal_points,
             analytics=analytics,
+            air_temp_c=self.last_air_temp_c,
+            humidity_pct=self.last_humidity_pct,
         )
 
     def get_current_state(self) -> FrontendUpdate:
@@ -170,6 +179,8 @@ class ArduinoConnection():
             sweep_cm=self.last_sweep_cm,
             thermal_points=thermal_points,
             analytics=analytics,
+            air_temp_c=self.last_air_temp_c,
+            humidity_pct=self.last_humidity_pct,
         )
 
 
