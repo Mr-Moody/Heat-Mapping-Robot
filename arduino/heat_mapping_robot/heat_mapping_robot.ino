@@ -1,24 +1,23 @@
 /*
  * Heat Mapping Robot — Arduino Sketch
- * Sends ultrasonic sweep readings to Python backend.
+ * Same logic as simulation robots: sends ultrasonic sweep to Python backend,
+ * receives F/B/L/R/S commands from backend (SLAM, occupancy grid, path planning).
  *
- * USE_SERIAL=1: USB serial (Arduino Uno, any board with Serial)
+ * USE_SERIAL=1: USB serial (Arduino Uno). Backend: cd backend && SERIAL_PORT=COMx python main.py
  * USE_SERIAL=0: WiFi HTTP POST (ESP32)
  * USE_IMU=1: Include Modulino Movement (LSM6DSOXTR) gyro/accel via I2C
- * USE_MOTORS=1: Enable DC motor drive (L298N style, same as motor_test)
+ * USE_MOTORS=1: Enable DC motor drive (L298N style)
+ * COMMAND_MODE=1: Backend-driven (same as simulation). COMMAND_MODE=0: legacy autonomous.
  *
- * Hardware:
- *   - HC-SR04 ultrasonic: TRIG_PIN, ECHO_PIN
- *   - 180° micro servo: SERVO_PIN (positional)
- *   - DHT11 temp/humidity: DHT_PIN (data)
- *   - Motors: in1/in2 (Motor A), in3/in4 (Motor B) — L298N style
- *   - Modulino Movement: I2C (Qwiic) for gyro_z, accel
+ * Hardware: HC-SR04 (5,7), servo (9), DHT11 (8), L298N motors (13,12,10,11)
  */
 
 #define USE_SERIAL 1   // 1 = USB serial, 0 = WiFi
 #define USE_IMU   0    // 1 = Modulino (UNO R4 only), 0 = skip (required for AVR/Arduino Uno)
 #define USE_MOTORS 1   // 1 = DC motors (L298N), 0 = servo/sensors only
-#define COMMAND_MODE 1 // 1 = backend sends F/B/L/R/S via serial, 0 = autonomous move-stop-sweep
+#define COMMAND_MODE 1 // 1 = backend-driven (SLAM/path planning), 0 = legacy move-stop-sweep
+#define BACKEND_CMD_TIMEOUT_MS 3000  // Block for command after send
+#define DEBUG_ULTRASONIC 0           // 1 = log distance readings to Serial
 
 #if !USE_SERIAL
 #include <WiFi.h>
@@ -73,7 +72,8 @@ struct Reading {
   float temp_c;   // air_temp at read time
   float gyro_z;   // yaw rate deg/s from IMU
 };
-#define SEND_CHUNK 8
+#define SEND_CHUNK 8   // Arduino Uno RAM: 8 readings per payload
+#define BACKEND_JSON_SIZE 384
 Reading buffer[SEND_CHUNK];
 int bufferIdx = 0;
 float currentAngle = 0.0;
@@ -91,7 +91,19 @@ enum RobotState { STATE_MOVE, STATE_STOP, STATE_SWEEP };
 RobotState robotState = STATE_MOVE;
 unsigned long stateStartMs = 0;
 #endif
-char currentMotorCmd = 'F';  // F=forward, B=back, L=left, R=right, S=stop
+#if USE_MOTORS && COMMAND_MODE
+enum BackendPhase { PHASE_COLLECT, PHASE_MOVE };
+BackendPhase backendPhase = PHASE_COLLECT;
+char backendCmd = 'F';      // From backend (F/B/L/R/S)
+char pendingMotorCmd = 'F';
+unsigned long phaseStartMs = 0;
+#define MOVE_FORWARD_MS  500
+#define TURN_15_MS       150
+#define TURN_45_MS       400
+#define TURN_90_MS       800
+#define OBSTACLE_THRESHOLD_CM 25.0f  // If forward < this, obstacle detected
+#define FORWARD_CONE_DEG  15.0f      // Forward = angles in [-15, +15]
+#endif
 
 // ── MOTORS ─────────────────────────────────────────────────────────────────
 #if USE_MOTORS
@@ -209,9 +221,9 @@ void stepServo() {
   sweepServo.write(angleToServo(currentAngle));
 }
 
-// ── SEND READINGS (Serial or WiFi) ────────────────────────────────────────
+// ── SEND READINGS (same format as robot_physical / backend ArduinoReadingsPayload) ─
 bool sendReadings(Reading* readings, int count) {
-  StaticJsonDocument<1024> doc;  // readings + thermal + IMU
+  StaticJsonDocument<BACKEND_JSON_SIZE> doc;
   doc["timestamp_ms"] = (long)(millis() - startTimeMs);
 
   unsigned long now = millis();
@@ -227,12 +239,22 @@ bool sendReadings(Reading* readings, int count) {
 
   JsonArray arr = doc.createNestedArray("readings");
   for (int i = 0; i < count; i++) {
-    JsonObject r = arr.add<JsonObject>();
-    r["angle"] = round(readings[i].angle * 10) / 10.0;
-    r["dist"] = round(readings[i].distance * 10) / 10.0;
-    r["distance"] = round(readings[i].distance * 10) / 10.0;  // Backend accepts both
-    r["temp"] = round(readings[i].temp_c * 10) / 10.0;
-    r["gyro_z"] = round(readings[i].gyro_z * 1000) / 1000.0;
+    float a = readings[i].angle;
+    float d = readings[i].distance;
+    if (!isnan(a) && !isinf(a) && !isnan(d) && !isinf(d)) {
+      JsonObject r = arr.add<JsonObject>();
+      r["angle"] = round(a * 10) / 10.0;
+      r["distance"] = round(d * 10) / 10.0;
+#if USE_IMU
+      r["gyro_z"] = round(readings[i].gyro_z * 1000) / 1000.0;
+#endif
+    }
+  }
+
+  if (doc.overflowed()) {
+    doc.clear();
+    doc["timestamp_ms"] = (long)(millis() - startTimeMs);
+    doc.createNestedArray("readings");
   }
 
   String body;
@@ -240,6 +262,7 @@ bool sendReadings(Reading* readings, int count) {
 
 #if USE_SERIAL
   Serial.println(body);
+  Serial.flush();
   return true;
 #else
   if (WiFi.status() != WL_CONNECTED) return false;
@@ -273,7 +296,10 @@ void setup() {
 
 #if USE_MOTORS
   motorSetup();
-  #if !COMMAND_MODE
+  #if COMMAND_MODE
+  backendPhase = PHASE_COLLECT;
+  phaseStartMs = millis();
+  #else
   robotState = STATE_MOVE;
   stateStartMs = millis();
   #endif
@@ -289,7 +315,7 @@ void setup() {
 #endif
 
 #if USE_SERIAL
-  Serial.println("USB Serial mode - connect to Python backend");
+  Serial.println(F("Heat Mapping Robot — Backend mode: SLAM, occupancy grid, path planning"));
 #else
   Serial.println("Connecting to WiFi...");
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
@@ -308,6 +334,30 @@ void setup() {
 }
 
 #if USE_MOTORS && COMMAND_MODE
+// Collision avoidance: if obstacle in forward cone, find angle with max distance and turn there
+void collisionAvoidance(Reading* buf, int n, char* cmd) {
+  float fwdMin = MAX_DISTANCE_CM;
+  for (int i = 0; i < n; i++) {
+    float a = buf[i].angle;
+    float d = buf[i].distance;
+    if (d <= 0 || d > MAX_VALID_CM) d = MAX_DISTANCE_CM;
+    if ((a < 0 ? -a : a) <= FORWARD_CONE_DEG && d < fwdMin) fwdMin = d;
+  }
+  if (fwdMin >= OBSTACLE_THRESHOLD_CM) return;  // No obstacle
+
+  float bestDist = 0.0f;
+  float bestAngle = 0.0f;
+  for (int i = 0; i < n; i++) {
+    float d = buf[i].distance;
+    if (d <= 0 || d > MAX_VALID_CM) d = MAX_DISTANCE_CM;
+    if (d > bestDist) {
+      bestDist = d;
+      bestAngle = buf[i].angle;
+    }
+  }
+  *cmd = (bestAngle < 0.0f) ? 'R' : 'L';  // Neg angle = clear on left; turn R to avoid (motor L/R may be swapped)
+}
+
 void applyMotorCmd(char cmd) {
   if (cmd == 'F') moveForward();
   else if (cmd == 'B') moveBackward();
@@ -315,15 +365,83 @@ void applyMotorCmd(char cmd) {
   else if (cmd == 'R') turnRight();
   else stopMotors();
 }
+
+char readBackendCommand() {
+  unsigned long start = millis();
+  while (millis() - start < BACKEND_CMD_TIMEOUT_MS) {
+    if (Serial.available()) {
+      char c = Serial.read();
+      if (c == 'F' || c == 'B' || c == 'L' || c == 'R' || c == 'S') {
+        return c;
+      }
+    }
+    delay(10);
+  }
+  return backendCmd;
+}
 #endif
 
 void loop() {
+  unsigned long now = millis();
+
 #if USE_MOTORS && COMMAND_MODE
-  if (Serial.available()) {
-    char c = Serial.read();
-    if (c == 'F' || c == 'B' || c == 'L' || c == 'R' || c == 'S')
-      currentMotorCmd = c;
+  // Backend-driven flow (same as simulation / robot_physical)
+  switch (backendPhase) {
+    case PHASE_COLLECT: {
+      float distRaw = readDistanceCmMedian(ULTRASONIC_SAMPLES);
+#if DEBUG_ULTRASONIC
+      Serial.print(F("US @ "));
+      Serial.print(currentAngle + ANGLE_OFFSET);
+      Serial.print(F(" deg: "));
+      Serial.print(distRaw);
+      Serial.println(F(" cm"));
+#endif
+      float dist = distRaw;
+      if (dist < MIN_DISTANCE_CM || dist > MAX_DISTANCE_CM || dist <= 0 || dist >= MAX_VALID_CM)
+        dist = 400.0f;
+
+      float gyroZ = 0.0f;
+      float tempC = lastTempC;
+      if (isnan(tempC)) tempC = 20.0f;
+#if USE_IMU
+      if (imu.update()) gyroZ = imu.getYaw();
+#endif
+
+      buffer[bufferIdx].angle = currentAngle + ANGLE_OFFSET;
+      buffer[bufferIdx].distance = dist;
+      buffer[bufferIdx].temp_c = tempC;
+      buffer[bufferIdx].gyro_z = gyroZ;
+      bufferIdx++;
+
+      if (bufferIdx >= SEND_CHUNK) {
+        sendReadings(buffer, SEND_CHUNK);
+        pendingMotorCmd = readBackendCommand();
+        backendCmd = pendingMotorCmd;
+        collisionAvoidance(buffer, SEND_CHUNK, &pendingMotorCmd);
+        bufferIdx = 0;
+        backendPhase = PHASE_MOVE;
+        phaseStartMs = now;
+      }
+      stepServo();
+      delay(80);
+      return;
+    }
+
+    case PHASE_MOVE: {
+      applyMotorCmd(pendingMotorCmd);
+      unsigned long durationMs = (pendingMotorCmd == 'F' || pendingMotorCmd == 'B')
+        ? MOVE_FORWARD_MS
+        : (pendingMotorCmd == 'L' || pendingMotorCmd == 'R') ? TURN_45_MS
+        : 500;
+      if (now - phaseStartMs >= durationMs) {
+        stopMotors();
+        backendPhase = PHASE_COLLECT;
+      }
+      delay(50);
+      return;
+    }
   }
+  return;
 #endif
 
 #if USE_MOTORS && !COMMAND_MODE
@@ -352,6 +470,13 @@ void loop() {
 #endif
 
   float distRaw = readDistanceCmMedian(ULTRASONIC_SAMPLES);
+#if DEBUG_ULTRASONIC
+  Serial.print(F("US @ "));
+  Serial.print(currentAngle + ANGLE_OFFSET);
+  Serial.print(F(" deg: "));
+  Serial.print(distRaw);
+  Serial.println(F(" cm"));
+#endif
   float dist = distRaw;
   if (dist < MIN_DISTANCE_CM || dist > MAX_DISTANCE_CM || dist <= 0 || dist >= MAX_VALID_CM)
     dist = 400.0;
@@ -373,14 +498,6 @@ void loop() {
     sendReadings(buffer, SEND_CHUNK);
     bufferIdx = 0;
   }
-
-#if USE_MOTORS && COMMAND_MODE
-  float fwd = (abs(currentAngle) < 15) ? distRaw : 400.0;
-  if (fwd >= MIN_DISTANCE_CM && fwd <= MAX_DISTANCE_CM && fwd < 15)
-    stopMotors();
-  else
-    applyMotorCmd(currentMotorCmd);
-#endif
 
   stepServo();
   delay(80);

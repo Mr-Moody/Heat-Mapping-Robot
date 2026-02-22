@@ -257,9 +257,11 @@ def get_current(robot_id: str | None = None):
     if rid == PHYSICAL_ROBOT_ID and _latest_arduino_update:
         u = _latest_arduino_update
         robot = u.get("robot") or {}
+        arduino_x, arduino_y = robot.get("x", 0), robot.get("y", 0)
+        floor_x, floor_y = _arduino_to_floor_position(arduino_x, arduino_y)
         return {
             "robot_id": rid,
-            "position": {"x": robot.get("x", 0), "y": robot.get("y", 0), "theta": robot.get("heading_deg", 0) * 3.14159 / 180},
+            "position": {"x": floor_x, "y": floor_y, "theta": robot.get("heading_deg", 0) * 3.14159 / 180},
             "temperature_c": u.get("air_temp_c"),
             "humidity_percent": u.get("humidity_pct"),
             "room_id": "corridor",
@@ -328,7 +330,14 @@ def _arduino_map_response(robot_id: str | None = None) -> dict:
                 if isinstance(val, (int, float)) and val > 0.7:
                     wx = x_min + (c + 0.5) * res
                     wy = y_min + (r + 0.5) * res
-                    obstacle_points.append([wx, 0.15, wy])
+                    fx, fy = _arduino_to_floor_position(wx, wy)
+                    obstacle_points.append([fx, 0.15, fy])
+    raw_points = u.get("points") or []
+    point_cloud = []
+    for p in raw_points:
+        if isinstance(p, (list, tuple)) and len(p) >= 3:
+            fx, fy = _arduino_to_floor_position(float(p[0]), float(p[2]))
+            point_cloud.append([fx, float(p[1]), fy])
     return {
         "grid": DEFAULT_GRID,
         "trail": [],
@@ -341,7 +350,7 @@ def _arduino_map_response(robot_id: str | None = None) -> dict:
         "occupancy_bounds": occ_bounds,
         "obstacle_points": obstacle_points,
         "obstacle_cells": [[r, c] for r, c in OBSTACLE_CELLS],
-        "point_cloud": u.get("points") or [],
+        "point_cloud": point_cloud,
     }
 
 
@@ -412,6 +421,17 @@ async def websocket_arduino(websocket: WebSocket):
             ws_connections.remove(websocket)
 
 
+def _arduino_to_floor_position(arduino_x: float, arduino_y: float) -> tuple[float, float]:
+    """Map Arduino meter coords [-5,5] to floor grid coords [0,cols] x [0,rows].
+    Center (0,0) in Arduino space maps to arena center (cols/2, rows/2)."""
+    from simulation.floorplan import DEFAULT_GRID
+    rows = len(DEFAULT_GRID)
+    cols = len(DEFAULT_GRID[0]) if DEFAULT_GRID else 1
+    floor_x = (arduino_x + 5.0) / 10.0 * cols
+    floor_y = (arduino_y + 5.0) / 10.0 * rows
+    return floor_x, floor_y
+
+
 def _frontend_update_to_robot_update(update: dict) -> dict:
     """Map Arduino FrontendUpdate dict to robot_update schema for /ws/live."""
     robot = update.get("robot") or {}
@@ -439,7 +459,7 @@ def _frontend_update_to_robot_update(update: dict) -> dict:
     res = 0.2 if (hr and hc) else 0.2
     if hr and hc:
         res = (x_max - x_min) / hc if hc else 0.2
-    points = update.get("points") or []
+    raw_points = update.get("points") or []
     obstacle_points = []
     if isinstance(occ, list) and occ:
         for r, row in enumerate(occ):
@@ -449,12 +469,22 @@ def _frontend_update_to_robot_update(update: dict) -> dict:
                 if isinstance(val, (int, float)) and val > 0.7:
                     wx = x_min + (c + 0.5) * res
                     wy = y_min + (r + 0.5) * res
-                    obstacle_points.append([wx, 0.15, wy])
+                    fx, fy = _arduino_to_floor_position(wx, wy)
+                    obstacle_points.append([fx, 0.15, fy])
+    # Transform point cloud from Arduino meter space to floor grid coords (relative to robot)
+    point_cloud = []
+    for p in raw_points:
+        if isinstance(p, (list, tuple)) and len(p) >= 3:
+            fx, fy = _arduino_to_floor_position(float(p[0]), float(p[2]))
+            point_cloud.append([fx, float(p[1]), fy])
     trail: list[list[float]] = []
+    arduino_x = robot.get("x", 0)
+    arduino_y = robot.get("y", 0)
+    floor_x, floor_y = _arduino_to_floor_position(arduino_x, arduino_y)
     return {
         "type": "robot_update",
         "robot_id": PHYSICAL_ROBOT_ID,
-        "position": {"x": robot.get("x", 0), "y": robot.get("y", 0), "theta": theta},
+        "position": {"x": floor_x, "y": floor_y, "theta": theta},
         "ultrasonic_distance_cm": (update.get("sweep_cm") or [150])[0] if update.get("sweep_cm") else 150,
         "temperature_c": update.get("air_temp_c"),
         "humidity_percent": update.get("humidity_pct"),
@@ -462,7 +492,7 @@ def _frontend_update_to_robot_update(update: dict) -> dict:
         "room_name": "Corridor",
         "trail": trail,
         "obstacle_points": obstacle_points,
-        "point_cloud": points,
+        "point_cloud": point_cloud,
         "heatmap_cells": heatmap_cells,
         "heatmap_rows": hr,
         "heatmap_cols": hc,

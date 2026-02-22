@@ -29,7 +29,7 @@ interface Robot3DProps {
 function Robot3D({ x, y, theta }: Robot3DProps) {
   const headingRad = theta + (3 * Math.PI) / 2
   return (
-    <group position={[x, 0, y]} rotation={[0, -headingRad, 0]}>
+    <group position={[x, 0, y]} rotation={[0, -headingRad, 0]} scale={[0.5, 0.5, 0.5]}>
       <mesh position={[0, bodyHeight / 2, 0]}>
         <boxGeometry args={[bodyWidth, bodyHeight, bodyDepth]} />
         <meshStandardMaterial color="#00d4aa" emissive="#00d4aa" emissiveIntensity={0.3} />
@@ -411,20 +411,22 @@ export default function RobotScene3D({
             <span>Temp: {state.temperature_c?.toFixed(1) ?? '—'} °C</span>
             <span>Humidity: {state.humidity_percent?.toFixed(0) ?? '—'} %</span>
           </div>
-          <div className="flex flex-col gap-1">
-            {pointCloud.length > 0 && (
-              <div className="text-xs text-uber-gray-mid bg-[rgba(26,35,50,0.9)] py-1 px-2 rounded flex items-center gap-1.5">
-                <span className="inline-block w-2 h-2 rounded-full bg-[#00d4aa]" />
-                Scan ({pointCloud.length})
-              </div>
-            )}
-            {obstaclePoints.length > 0 && (
-              <div className="text-xs text-uber-gray-mid bg-[rgba(26,35,50,0.9)] py-1 px-2 rounded flex items-center gap-1.5">
-                <span className="inline-block w-2 h-2 rounded-full bg-[#ff6b6b]" />
-                SLAM obstacles ({obstaclePoints.length})
-              </div>
-            )}
-          </div>
+          {(pointCloud.length > 0 || obstaclePoints.length > 0) && (
+            <div className="text-xs text-uber-gray-mid bg-[rgba(26,35,50,0.9)] py-1 px-2 rounded flex flex-row items-center gap-3">
+              {pointCloud.length > 0 && (
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block w-2 h-2 rounded-full bg-[#00d4aa]" />
+                  SLAM environment ({pointCloud.length})
+                </span>
+              )}
+              {obstaclePoints.length > 0 && (
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block w-2 h-2 rounded-full bg-[#ff6b6b]" />
+                  SLAM obstacles ({obstaclePoints.length})
+                </span>
+              )}
+            </div>
+          )}
         </div>
       )}
       <Canvas
