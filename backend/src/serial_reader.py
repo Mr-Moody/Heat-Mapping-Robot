@@ -69,19 +69,20 @@ def run_serial_reader(
         return
 
     buffer = ""
+    msg_count = 0
     while not stop_event.is_set():
         try:
             if stop_event.is_set():
                 break
-            chunk = ser.read(ser.in_waiting or 1)
+            n = getattr(ser, 'in_waiting', 0) or 256
+            chunk = ser.read(min(n, 4096))
             if not chunk:
                 continue
             buffer += chunk.decode("utf-8", errors="ignore")
 
-            while "\n" in buffer or "\r" in buffer:
-                sep = "\n" if "\n" in buffer else "\r"
-                line, _, buffer = buffer.partition(sep)
-                line = line.strip()
+            while "\n" in buffer:
+                line, _, buffer = buffer.partition("\n")
+                line = line.strip().rstrip("\r")
                 if not line or not line.startswith("{"):
                     continue
 
@@ -93,10 +94,24 @@ def run_serial_reader(
                     cmd = connection.pop_pending_motor_cmd()
                     if cmd:
                         ser.write(cmd.encode() + b"\n")
-                except (json.JSONDecodeError, TypeError, ValueError) as e:
-                    logger.debug("Serial parse error: %s", e)
+                        msg_count += 1
+                        if msg_count <= 5 or msg_count % 20 == 0:
+                            logger.info("-> Arduino cmd #%d: %s", msg_count, cmd)
+                except json.JSONDecodeError as e:
+                    pos = getattr(e, "pos", None)
+                    ctx = ""
+                    if pos is not None and 0 <= pos < len(line):
+                        start = max(0, pos - 3)
+                        end = min(len(line), pos + 4)
+                        ctx = repr(line[start:end])
+                    logger.warning(
+                        "Serial parse error: %s | len=%d | at pos %s: %s | line: %s",
+                        e, len(line), pos, ctx, line[:200] + ("..." if len(line) > 200 else ""),
+                    )
+                except (TypeError, ValueError) as e:
+                    logger.warning("Serial parse error: %s (line: %s...)", e, line[:80])
                 except Exception as e:
-                    logger.exception("Error processing serial payload: %s", e)
+                    logger.exception("Error processing serial payload")
 
         except Exception as e:
             logger.exception("Serial read error: %s", e)

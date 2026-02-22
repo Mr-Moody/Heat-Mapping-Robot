@@ -1,0 +1,15 @@
+{"hypothesisId": "H1", "location": "serial_reader:parse_err", "message": "Parse failed", "data": {"line_len": 374, "pos": 310, "ctx": "':0,:150'"}, "timestamp": 1771748575254}
+{"hypothesisId": "H1", "location": "serial_reader:parse_err", "message": "Parse failed", "data": {"line_len": 372, "pos": 341, "ctx": "'0},,{\"a'"}, "timestamp": 1771748584168}
+{"hypothesisId": "H1", "location": "serial_reader:parse_ok", "message": "Parse success", "data": {"line_len": 300, "readings_count": 8}, "timestamp": 1771748776248}
+{"hypothesisId": "H1", "location": "serial_reader:parse_ok", "message": "Parse success", "data": {"line_len": 292, "readings_count": 8}, "timestamp": 1771748782426}
+{"hypothesisId": "H1", "location": "serial_reader:parse_ok", "message": "Parse success", "data": {"line_len": 293, "readings_count": 8}, "timestamp": 1771748788641}
+{"hypothesisId": "H1", "location": "serial_reader:parse_ok", "message": "Parse success", "data": {"line_len": 293, "readings_count": 8}, "timestamp": 1771748794833}
+{"hypothesisId": "H1", "location": "serial_reader:parse_ok", "message": "Parse success", "data": {"line_len": 293, "readings_count": 8}, "timestamp": 1771748801042}
+{"hypothesisId": "H1", "location": "serial_reader:parse_ok", "message": "Parse success", "data": {"line_len": 293, "readings_count": 8}, "timestamp": 1771748807063}
+{"hypothesisId": "H1", "location": "serial_reader:parse_ok", "message": "Parse success", "data": {"line_len": 293, "readings_count": 8}, "timestamp": 1771748813242}
+{"hypothesisId": "H1", "location": "serial_reader:parse_ok", "message": "Parse success", "data": {"line_len": 293, "readings_count": 8}, "timestamp": 1771748819527}
+{"hypothesisId": "H1", "location": "serial_reader:parse_ok", "message": "Parse success", "data": {"line_len": 293, "readings_count": 8}, "timestamp": 1771748825691}
+{"hypothesisId": "H1", "location": "serial_reader:parse_ok", "message": "Parse success", "data": {"line_len": 293, "readings_count": 8}, "timestamp": 1771748831892}
+{"hypothesisId": "H1", "location": "serial_reader:parse_ok", "message": "Parse success", "data": {"line_len": 293, "readings_count": 8}, "timestamp": 1771748838040}
+{"hypothesisId": "H1", "location": "serial_reader:parse_ok", "message": "Parse success", "data": {"line_len": 293, "readings_count": 8}, "timestamp": 1771748844334}
+{"hypothesisId": "H1", "location": "serial_reader:parse_ok", "message": "Parse success", "data": {"line_len": 293, "readings_count": 8}, "timestamp": 1771748850538}

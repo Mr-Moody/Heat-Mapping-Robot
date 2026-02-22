@@ -12,6 +12,8 @@ import type { RobotInfo } from '../components/RobotCard'
 const WS_URL =
   (location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + location.host
 
+const PHYSICAL_ROBOT_ID = 'robot-4'
+
 interface RobotState {
   position?: { x: number; y: number; theta?: number }
   ultrasonic_distance_cm?: number
@@ -62,7 +64,8 @@ export default function LiveDashboardPage() {
 
   useEffect(() => {
     if (robots.length > 0 && !selectedRobotId) {
-      const firstActive = robots.find((r) => r.active) ?? robots[0]
+      const physicalActive = robots.find((r) => r.id === PHYSICAL_ROBOT_ID && r.active)
+      const firstActive = physicalActive ?? robots.find((r) => r.active) ?? robots[0]
       setSelectedRobotId(firstActive.id)
       setIsLoadingSelectedRobot(true)
     }
@@ -158,12 +161,12 @@ export default function LiveDashboardPage() {
           if (Array.isArray(d.obstacle_cells)) setObstacleCells(d.obstacle_cells)
           if (!connected) {
             if (Array.isArray(d.trail)) setTrail(d.trail)
-            if (d.heatmap_cells) setHeatmapCells(d.heatmap_cells)
-            if (d.heatmap_rows != null) setHeatmapRows(d.heatmap_rows)
-            if (d.heatmap_cols != null) setHeatmapCols(d.heatmap_cols)
             if (Array.isArray(d.obstacle_points)) setObstaclePoints(d.obstacle_points)
             if (Array.isArray(d.point_cloud)) setPointCloud(d.point_cloud)
           }
+          if (d.heatmap_cells) setHeatmapCells(d.heatmap_cells)
+          if (d.heatmap_rows != null) setHeatmapRows(d.heatmap_rows)
+          if (d.heatmap_cols != null) setHeatmapCols(d.heatmap_cols)
           setIsLoadingSelectedRobot(false)
         })
         .catch(() => {})

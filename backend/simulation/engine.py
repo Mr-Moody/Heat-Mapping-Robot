@@ -40,23 +40,28 @@ class RobotState:
 HEATMAP_SUBDIV = 4  # 4x4 per 1m cell -> 0.25m resolution for higher area resolution
 ACTIVE_TIMEOUT = 60.0  # seconds; robot is "active" if state within this
 
-ROBOT_IDS = ["robot-1", "robot-2", "robot-3"]
+# robot-4 = physical slot (dead in sim, active when Arduino connects)
+ROBOT_IDS = ["robot-1", "robot-2", "robot-3", "robot-4"]
 ROBOT_NAMES = {
     "robot-1": "Scout Alpha",
     "robot-2": "Scout Beta",
     "robot-3": "Scout Gamma",
+    "robot-4": "Physical Robot",
 }
 ROBOT_ROOM_ASSIGNMENTS = {
     "robot-1": "floor_5",
     "robot-2": "floor_6",
     "robot-3": "floor_8",
+    "robot-4": "corridor",
 }
-# Distinct start positions for each robot
+# Distinct start positions; robot-4 unused (physical slot, no sim updates)
 ROBOT_STARTS = [
     (14.5, 5.0),
     (10.5, 4.0),
     (18.5, 6.0),
+    (14.5, 5.0),  # placeholder for robot-4
 ]
+PHYSICAL_ROBOT_ID = "robot-4"
 
 
 class SimulationEngine:
@@ -216,6 +221,8 @@ class SimulationEngine:
             now = time.time()
 
             for rid in ROBOT_IDS:
+                if rid == PHYSICAL_ROBOT_ID:
+                    continue  # physical slot: no sim updates, stays dead
                 robot = self._robots[rid]
                 slam = self._slams[rid]
                 controller = self._controllers[rid]
