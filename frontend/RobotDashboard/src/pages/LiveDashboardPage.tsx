@@ -5,6 +5,8 @@ import AnalyticsPanel from '../components/AnalyticsPanel'
 import Alerts from '../components/Alerts'
 import SensorReadout from '../components/SensorReadout'
 import DashboardSkeleton from '../components/DashboardSkeleton'
+import RobotListPanel from '../components/RobotListPanel'
+import type { RobotInfo } from '../components/RobotCard'
 
 const WS_URL =
   (location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + location.host
@@ -45,10 +47,27 @@ export default function LiveDashboardPage() {
   const [viewMode, setViewMode] = useState<'2d' | '3d'>('3d')
   const [liveOpacity, setLiveOpacity] = useState(1)
 
+  const [robots, setRobots] = useState<RobotInfo[]>([])
+  const [selectedRobotId, setSelectedRobotId] = useState<string | null>(null)
+  const [robotStates, setRobotStates] = useState<Record<string, RobotState | null>>({})
+
   useEffect(() => {
     const ready = connected || grid.length > 0 || (state?.position != null) || rooms.length > 0
     setHasData(ready)
   }, [connected, grid.length, state?.position, rooms.length])
+
+  useEffect(() => {
+    if (robots.length > 0 && !selectedRobotId) {
+      const firstActive = robots.find((r) => r.active) ?? robots[0]
+      setSelectedRobotId(firstActive.id)
+    }
+  }, [robots, selectedRobotId])
+
+  useEffect(() => {
+    if (selectedRobotId && robotStates[selectedRobotId]) {
+      setState(robotStates[selectedRobotId])
+    }
+  }, [selectedRobotId, robotStates])
 
   useEffect(() => {
     if (!connected) return
@@ -65,6 +84,19 @@ export default function LiveDashboardPage() {
   }, [connected])
 
   useEffect(() => {
+    const fetchRobots = () =>
+      fetch('/api/robots')
+        .then((r) => r.json())
+        .then((d: { robots?: RobotInfo[] }) => {
+          if (Array.isArray(d.robots)) setRobots(d.robots)
+        })
+        .catch(() => {})
+    fetchRobots()
+    const id = setInterval(fetchRobots, 5000)
+    return () => clearInterval(id)
+  }, [])
+
+  useEffect(() => {
     const ws = new WebSocket(WS_URL + '/ws/live')
     ws.onopen = () => setConnected(true)
     ws.onclose = () => setConnected(false)
@@ -74,46 +106,70 @@ export default function LiveDashboardPage() {
         const data = JSON.parse(e.data)
         if (data.type === 'analytics') {
           setRooms(data.rooms || [])
-          setTrail(data.trail || [])
-          if (data.heatmap_cells) setHeatmapCells(data.heatmap_cells)
-          if (data.heatmap_rows != null) setHeatmapRows(data.heatmap_rows)
-          if (data.heatmap_cols != null) setHeatmapCols(data.heatmap_cols)
-          if (Array.isArray(data.obstacle_points)) setObstaclePoints(data.obstacle_points)
-          if (Array.isArray(data.point_cloud)) setPointCloud(data.point_cloud)
-        } else if (data.position) {
-          setState(data)
-        } else {
-          setState(data)
+        } else if (data.type === 'robot_update' && data.robot_id) {
+          const rid = data.robot_id
+          const s: RobotState = {
+            position: data.position,
+            ultrasonic_distance_cm: data.ultrasonic_distance_cm,
+            temperature_c: data.temperature_c,
+            humidity_percent: data.humidity_percent,
+            room_id: data.room_id,
+          }
+          setRobotStates((prev) => ({ ...prev, [rid]: s }))
+          if (rid === selectedRobotId) {
+            setState(s)
+            if (Array.isArray(data.trail)) setTrail(data.trail)
+            if (data.heatmap_cells) setHeatmapCells(data.heatmap_cells)
+            if (data.heatmap_rows != null) setHeatmapRows(data.heatmap_rows)
+            if (data.heatmap_cols != null) setHeatmapCols(data.heatmap_cols)
+            if (Array.isArray(data.obstacle_points)) setObstaclePoints(data.obstacle_points)
+            if (Array.isArray(data.point_cloud)) setPointCloud(data.point_cloud)
+          }
         }
       } catch {
         // ignore parse errors
       }
     }
     return () => ws.close()
-  }, [])
+  }, [selectedRobotId])
 
   useEffect(() => {
+    const rid = selectedRobotId
     const fetchMap = () =>
-      fetch('/api/map')
+      fetch(rid ? `/api/map?robot_id=${encodeURIComponent(rid)}` : '/api/map')
         .then((r) => r.json())
         .then((d: { grid?: number[][]; rows?: number; cols?: number; trail?: [number, number][]; heatmap_cells?: Record<string, number>; heatmap_rows?: number; heatmap_cols?: number; obstacle_points?: number[][]; point_cloud?: number[][] }) => {
           setGrid(d.grid || [])
           setRows(d.rows || 0)
           setCols(d.cols || 0)
-          if (!connected) setTrail(d.trail || [])
-          if (d.heatmap_cells) setHeatmapCells(d.heatmap_cells)
-          if (d.heatmap_rows != null) setHeatmapRows(d.heatmap_rows)
-          if (d.heatmap_cols != null) setHeatmapCols(d.heatmap_cols)
-          if (Array.isArray(d.obstacle_points)) setObstaclePoints(d.obstacle_points)
-          if (Array.isArray(d.point_cloud)) setPointCloud(d.point_cloud)
+          if (!connected) {
+            if (Array.isArray(d.trail)) setTrail(d.trail)
+            if (d.heatmap_cells) setHeatmapCells(d.heatmap_cells)
+            if (d.heatmap_rows != null) setHeatmapRows(d.heatmap_rows)
+            if (d.heatmap_cols != null) setHeatmapCols(d.heatmap_cols)
+            if (Array.isArray(d.obstacle_points)) setObstaclePoints(d.obstacle_points)
+            if (Array.isArray(d.point_cloud)) setPointCloud(d.point_cloud)
+          }
         })
         .catch(() => {})
 
     const fetchCurrent = () =>
-      fetch('/api/current')
+      fetch(rid ? `/api/current?robot_id=${encodeURIComponent(rid)}` : '/api/current')
         .then((r) => r.json())
-        .then((d: { position?: { x: number; y: number; theta?: number }; ultrasonic_distance_cm?: number }) => {
-          if (d.position != null || d.ultrasonic_distance_cm != null) setState(d)
+        .then((d: RobotState & { robot_id?: string }) => {
+          if (d.position != null || d.ultrasonic_distance_cm != null) {
+            const s: RobotState = {
+              position: d.position,
+              ultrasonic_distance_cm: d.ultrasonic_distance_cm,
+              temperature_c: d.temperature_c,
+              humidity_percent: d.humidity_percent,
+              room_id: d.room_id,
+            }
+            setState(s)
+            if (d.robot_id) {
+              setRobotStates((prev) => ({ ...prev, [d.robot_id!]: s }))
+            }
+          }
         })
         .catch(() => {})
 
@@ -125,7 +181,6 @@ export default function LiveDashboardPage() {
         })
         .catch(() => {})
 
-    // Fire all three in parallel for faster initial load
     fetchMap()
     fetchCurrent()
     fetchRooms()
@@ -139,12 +194,26 @@ export default function LiveDashboardPage() {
       }
     }, interval)
     return () => clearInterval(id)
-  }, [connected])
+  }, [connected, selectedRobotId])
 
   return (
     <div className="flex flex-col min-h-[calc(100vh-4rem)]">
       {hasData ? (
-        <main className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4 p-4 overflow-visible animate-fade-slide">
+        <main className={`flex-1 grid grid-cols-1 gap-4 p-4 overflow-visible animate-fade-slide ${robots.length > 0 ? 'lg:grid-cols-[200px_1fr_320px]' : 'lg:grid-cols-[1fr_320px]'}`}>
+          {robots.length > 0 && (
+            <RobotListPanel
+              robots={robots}
+              selectedRobotId={selectedRobotId}
+              onSelectRobot={setSelectedRobotId}
+              robotStates={robotStates}
+              grid={grid}
+              heatmapCells={heatmapCells}
+              rows={rows}
+              cols={cols}
+              heatmapRows={heatmapRows}
+              heatmapCols={heatmapCols}
+            />
+          )}
           <section className="relative z-0 bg-[#1a2332] rounded-lg border border-[#30363d] overflow-hidden min-h-[400px] flex flex-col">
             <div className="flex gap-0 p-1 pt-1 pr-1 pl-1 pb-0 bg-[#243044] border-b border-[#30363d]">
               <button

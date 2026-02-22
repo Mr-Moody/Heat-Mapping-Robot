@@ -4,7 +4,17 @@
  */
 export default function DashboardSkeleton() {
   return (
-    <main className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4 p-4 overflow-visible">
+    <main className="flex-1 grid grid-cols-1 lg:grid-cols-[200px_1fr_320px] gap-4 p-4 overflow-visible">
+      {/* Robot list panel skeleton */}
+      <aside className="hidden lg:flex flex-col gap-3 min-w-[200px] w-[200px] shrink-0 py-2">
+        <div className="skeleton h-3 w-14 rounded px-2" />
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="rounded-lg border border-[#30363d] p-2 space-y-2">
+            <div className="skeleton aspect-[4/3] w-full rounded" />
+            <div className="skeleton h-4 w-20 rounded" />
+          </div>
+        ))}
+      </aside>
       {/* Map section skeleton */}
       <section className="relative z-0 bg-[#1a2332] rounded-lg border border-[#30363d] overflow-hidden min-h-[400px] flex flex-col">
         {/* Tab bar */}

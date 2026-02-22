@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
-from simulation.engine import SimulationEngine, RobotState
+from simulation.engine import SimulationEngine, RobotState, ROBOT_IDS
 from analytics import compute_room_analytics
 
 engine: SimulationEngine | None = None
@@ -40,14 +40,46 @@ app.add_middleware(
 )
 
 
+@app.get("/api/robots")
+def get_robots():
+    """List all robots, sorted: active first, then inactive."""
+    if not engine:
+        return {"robots": []}
+    names = engine.get_robot_names()
+    robots = []
+    for rid in engine.get_robot_ids():
+        state = engine.get_current_state(rid)
+        active = engine.is_robot_active(rid)
+        last_seen = state.timestamp if state else None
+        robots.append({
+            "id": rid,
+            "name": names.get(rid, rid),
+            "active": active,
+            "last_seen": last_seen,
+        })
+    robots.sort(key=lambda r: (0 if r["active"] else 1, -(r["last_seen"] or 0)))
+    return {"robots": robots}
+
+
 @app.get("/api/current")
-def get_current():
-    """Latest robot state."""
+def get_current(robot_id: str | None = None):
+    """Latest robot state. Optional robot_id query; defaults to first active robot."""
     if not engine:
         return {"error": "Engine not ready"}
-    s = engine.get_current_state()
+    if robot_id and robot_id not in engine.get_robot_ids():
+        return {"error": f"Unknown robot_id: {robot_id}"}
+    rid = robot_id
+    if not rid:
+        for r in engine.get_robot_ids():
+            if engine.is_robot_active(r):
+                rid = r
+                break
+        rid = rid or engine.get_robot_ids()[0]
+    s = engine.get_current_state(rid)
     if s:
-        return s.to_dict()
+        d = s.to_dict()
+        d["robot_id"] = rid
+        return d
     return {"message": "No data yet"}
 
 
@@ -63,20 +95,23 @@ def get_rooms():
 
 
 @app.get("/api/map")
-def get_map():
-    """Floorplan grid, trail, heatmap, and SLAM occupancy for visualization."""
+def get_map(robot_id: str | None = None):
+    """Floorplan grid, trail, heatmap, and SLAM occupancy for robot_id."""
     if not engine:
         return {
             "grid": [], "trail": [], "heatmap_cells": {}, "heatmap_rows": 0, "heatmap_cols": 0,
             "occupancy_grid": None, "occupancy_bounds": None, "obstacle_points": [],
-            "point_cloud": [],
+            "point_cloud": [], "rows": 0, "cols": 0,
         }
+    if robot_id and robot_id not in engine.get_robot_ids():
+        robot_id = engine.get_robot_ids()[0]
+    rid = robot_id or engine.get_robot_ids()[0]
     hr, hc = engine.get_heatmap_shape()
-    slam = engine.slam
+    slam = engine._slams[rid]
     occ_bounds = slam.get_occupancy_bounds()
     return {
         "grid": engine.get_grid(),
-        "trail": engine.get_trail(),
+        "trail": engine.get_trail(rid),
         "heatmap_cells": engine.get_heatmap_cells(),
         "rows": engine.floorplan.rows,
         "cols": engine.floorplan.cols,
@@ -84,8 +119,8 @@ def get_map():
         "heatmap_cols": hc,
         "occupancy_grid": slam.get_occupancy_grid(),
         "occupancy_bounds": list(occ_bounds),
-        "obstacle_points": slam.get_obstacle_points(),
-        "point_cloud": engine.get_simulated_point_cloud(),
+        "obstacle_points": engine.get_obstacle_points(rid),
+        "point_cloud": engine.get_simulated_point_cloud(rid),
     }
 
 
@@ -97,26 +132,28 @@ async def websocket_live(ws: WebSocket):
             if not engine:
                 await asyncio.sleep(0.1)
                 continue
-            state = engine.get_current_state()
-            if state:
-                await ws.send_json(state.to_dict())
             grid = engine.get_grid()
             heatmap = engine.get_heatmap_data()
             rooms = compute_room_analytics(heatmap, grid, heatmap_subdiv=4)
-            hr, hc = engine.get_heatmap_shape()
-            slam = engine.slam
-            await ws.send_json({
-                "type": "analytics",
-                "rooms": rooms,
-                "trail": engine.get_trail(),
-                "heatmap_cells": engine.get_heatmap_cells(),
-                "heatmap_rows": hr,
-                "heatmap_cols": hc,
-                "occupancy_grid": slam.get_occupancy_grid(),
-                "occupancy_bounds": list(slam.get_occupancy_bounds()),
-                "obstacle_points": slam.get_obstacle_points(),
-                "point_cloud": engine.get_simulated_point_cloud(),
-            })
+            await ws.send_json({"type": "analytics", "rooms": rooms})
+
+            for rid in ROBOT_IDS:
+                state = engine.get_current_state(rid)
+                slam = engine._slams[rid]
+                if state:
+                    msg = {
+                        "type": "robot_update",
+                        "robot_id": rid,
+                        **state.to_dict(),
+                        "trail": engine.get_trail(rid),
+                        "obstacle_points": engine.get_obstacle_points(rid),
+                        "point_cloud": engine.get_simulated_point_cloud(rid),
+                        "heatmap_cells": engine.get_heatmap_cells(),
+                        "heatmap_rows": engine.get_heatmap_shape()[0],
+                        "heatmap_cols": engine.get_heatmap_shape()[1],
+                    }
+                    await ws.send_json(msg)
+
             await asyncio.sleep(0.15)
     except WebSocketDisconnect:
         pass
