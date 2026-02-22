@@ -143,21 +143,6 @@ export default function LiveDashboardPage() {
 
   return (
     <div className="flex flex-col min-h-[calc(100vh-4rem)]">
-      <header className="px-4 sm:px-6 py-4 bg-[#1a2332] border-b border-[#30363d] flex flex-wrap items-center gap-4">
-        <h1 className="m-0 text-xl font-bold text-cyan-400">ThermalScout</h1>
-        <span className="text-sm text-uber-gray-mid">Autonomous Radiator Thermal Mapping</span>
-        <div className={`ml-auto font-mono text-sm flex items-center gap-1.5 ${hasData ? 'text-cyan-400' : 'text-uber-gray-mid'}`}>
-          {hasData ? (
-            <>
-              <span className="inline-block" style={{ opacity: connected ? liveOpacity : 1 }}>●</span>
-              <span>{connected ? 'LIVE' : 'Live (polling)'}</span>
-            </>
-          ) : (
-            '○ Connecting...'
-          )}
-        </div>
-      </header>
-
       {hasData ? (
         <main className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4 p-4 overflow-visible animate-fade-slide">
           <section className="relative z-0 bg-[#1a2332] rounded-lg border border-[#30363d] overflow-hidden min-h-[400px] flex flex-col">
@@ -220,7 +205,7 @@ export default function LiveDashboardPage() {
           </section>
 
           <aside className="relative z-10 flex flex-col gap-4 overflow-y-auto overflow-x-hidden min-w-0 shrink-0 px-2 py-1">
-            <SensorReadout state={state} />
+            <SensorReadout state={state} liveStatus={{ hasData, connected, liveOpacity }} />
             <AnalyticsPanel rooms={rooms} />
             <Alerts rooms={rooms} />
           </aside>
