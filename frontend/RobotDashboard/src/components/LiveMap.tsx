@@ -74,6 +74,7 @@ interface LiveMapProps {
   state?: LiveMapState | null
   trail?: [number, number][] | null
   heatmapCells?: Record<string, number>
+  obstacleCells?: [number, number][] | null
 }
 
 export default function LiveMap({
@@ -85,6 +86,7 @@ export default function LiveMap({
   state,
   trail,
   heatmapCells = {},
+  obstacleCells = [],
 }: LiveMapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const PIXELS_PER_CELL = 20
@@ -170,7 +172,18 @@ export default function LiveMap({
       ctx.lineWidth = 2
       ctx.stroke()
     }
-  }, [grid, rows, cols, hRows, hCols, state, trail, heatmapCells])
+
+    if (obstacleCells && obstacleCells.length > 0) {
+      const cellW = w / cols
+      const cellH = h / rows
+      ctx.fillStyle = '#000000'
+      for (const [row, col] of obstacleCells) {
+        const px = (col / cols) * w
+        const py = (row / rows) * h
+        ctx.fillRect(px, py, cellW, cellH)
+      }
+    }
+  }, [grid, rows, cols, hRows, hCols, state, trail, heatmapCells, obstacleCells])
 
   useEffect(() => {
     draw()

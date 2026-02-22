@@ -40,7 +40,9 @@ DEFAULT_GRID = [
 
 # Single space: one analytics entry for the whole floor.
 SPACES = [
-    {"id": "floor_8", "name": "Floor 8", "cell_types": [CellType.FLOOR]},
+    {"id": "floor_5", "name": "Innovation Lab", "cell_types": [CellType.FLOOR]},
+    {"id": "floor_6", "name": "Project Space", "cell_types": [CellType.FLOOR]},
+    {"id": "floor_8", "name": "Propulsion Lab", "cell_types": [CellType.FLOOR]},
 ]
 
 ROOM_CONFIGS = {
@@ -59,6 +61,15 @@ ROOM_CONFIGS = {
 OBSTACLE_CELLS = frozenset({
     (3, 8), (4, 14), (5, 20), (6, 10), (6, 18),
 })
+
+ROOM_ID_TO_NAME: dict[str, str] = {r.id: r.name for r in ROOM_CONFIGS.values()}
+
+
+def get_room_name(room_id: str | None) -> str:
+    """Return display name for room_id; 'Corridor' for None or unknown."""
+    if not room_id:
+        return "Corridor"
+    return ROOM_ID_TO_NAME.get(room_id, room_id)
 
 
 class Floorplan:

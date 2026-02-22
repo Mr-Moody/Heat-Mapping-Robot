@@ -8,6 +8,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from simulation.engine import SimulationEngine, RobotState, ROBOT_IDS
+from simulation.floorplan import get_room_name
 from analytics import compute_room_analytics
 
 engine: SimulationEngine | None = None
@@ -79,6 +80,7 @@ def get_current(robot_id: str | None = None):
     if s:
         d = s.to_dict()
         d["robot_id"] = rid
+        d["room_name"] = get_room_name(d.get("room_id"))
         return d
     return {"message": "No data yet"}
 
@@ -101,7 +103,7 @@ def get_map(robot_id: str | None = None):
         return {
             "grid": [], "trail": [], "heatmap_cells": {}, "heatmap_rows": 0, "heatmap_cols": 0,
             "occupancy_grid": None, "occupancy_bounds": None, "obstacle_points": [],
-            "point_cloud": [], "rows": 0, "cols": 0,
+            "obstacle_cells": [], "point_cloud": [], "rows": 0, "cols": 0,
         }
     if robot_id and robot_id not in engine.get_robot_ids():
         robot_id = engine.get_robot_ids()[0]
@@ -120,6 +122,7 @@ def get_map(robot_id: str | None = None):
         "occupancy_grid": slam.get_occupancy_grid(),
         "occupancy_bounds": list(occ_bounds),
         "obstacle_points": engine.get_obstacle_points(rid),
+        "obstacle_cells": engine.get_obstacle_cells(),
         "point_cloud": engine.get_simulated_point_cloud(rid),
     }
 
@@ -141,10 +144,12 @@ async def websocket_live(ws: WebSocket):
                 state = engine.get_current_state(rid)
                 slam = engine._slams[rid]
                 if state:
+                    d = state.to_dict()
+                    d["room_name"] = get_room_name(d.get("room_id"))
                     msg = {
                         "type": "robot_update",
                         "robot_id": rid,
-                        **state.to_dict(),
+                        **d,
                         "trail": engine.get_trail(rid),
                         "obstacle_points": engine.get_obstacle_points(rid),
                         "point_cloud": engine.get_simulated_point_cloud(rid),

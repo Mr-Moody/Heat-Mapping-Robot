@@ -7,7 +7,7 @@ import asyncio
 import math
 import random
 from dataclasses import dataclass
-from .floorplan import Floorplan
+from .floorplan import Floorplan, OBSTACLE_CELLS
 from .robot import Robot
 from .sensors import SensorSimulator
 from .waypoint_controller import WaypointController
@@ -164,6 +164,10 @@ class SimulationEngine:
         if not slam:
             return []
         return slam.get_obstacle_points()
+
+    def get_obstacle_cells(self) -> list[list[int]]:
+        """Static floorplan obstacles as [row, col] for 2D/3D visualization."""
+        return [[r, c] for r, c in OBSTACLE_CELLS]
 
     def get_simulated_point_cloud(
         self,

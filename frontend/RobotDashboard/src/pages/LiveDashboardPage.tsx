@@ -18,6 +18,7 @@ interface RobotState {
   temperature_c?: number
   humidity_percent?: number
   room_id?: string
+  room_name?: string
 }
 
 interface RoomAnalytics {
@@ -42,6 +43,7 @@ export default function LiveDashboardPage() {
   const [heatmapRows, setHeatmapRows] = useState(0)
   const [heatmapCols, setHeatmapCols] = useState(0)
   const [obstaclePoints, setObstaclePoints] = useState<number[][]>([])
+  const [obstacleCells, setObstacleCells] = useState<[number, number][]>([])
   const [pointCloud, setPointCloud] = useState<number[][]>([])
   const [connected, setConnected] = useState(false)
   const [hasData, setHasData] = useState(false)
@@ -123,6 +125,7 @@ export default function LiveDashboardPage() {
             temperature_c: data.temperature_c,
             humidity_percent: data.humidity_percent,
             room_id: data.room_id,
+            room_name: data.room_name,
           }
           setRobotStates((prev) => ({ ...prev, [rid]: s }))
           if (rid === selectedRobotId) {
@@ -148,10 +151,11 @@ export default function LiveDashboardPage() {
     const fetchMap = () =>
       fetch(rid ? `/api/map?robot_id=${encodeURIComponent(rid)}` : '/api/map')
         .then((r) => r.json())
-        .then((d: { grid?: number[][]; rows?: number; cols?: number; trail?: [number, number][]; heatmap_cells?: Record<string, number>; heatmap_rows?: number; heatmap_cols?: number; obstacle_points?: number[][]; point_cloud?: number[][] }) => {
+        .then((d: { grid?: number[][]; rows?: number; cols?: number; trail?: [number, number][]; heatmap_cells?: Record<string, number>; heatmap_rows?: number; heatmap_cols?: number; obstacle_points?: number[][]; obstacle_cells?: [number, number][]; point_cloud?: number[][] }) => {
           setGrid(d.grid || [])
           setRows(d.rows || 0)
           setCols(d.cols || 0)
+          if (Array.isArray(d.obstacle_cells)) setObstacleCells(d.obstacle_cells)
           if (!connected) {
             if (Array.isArray(d.trail)) setTrail(d.trail)
             if (d.heatmap_cells) setHeatmapCells(d.heatmap_cells)
@@ -175,6 +179,7 @@ export default function LiveDashboardPage() {
               temperature_c: d.temperature_c,
               humidity_percent: d.humidity_percent,
               room_id: d.room_id,
+              room_name: d.room_name,
             }
             setState(s)
             if (d.robot_id) {
@@ -267,6 +272,7 @@ export default function LiveDashboardPage() {
                     state={state}
                     trail={trail}
                     heatmapCells={heatmapCells}
+                    obstacleCells={obstacleCells}
                   />
                 </div>
               ) : (
@@ -281,6 +287,7 @@ export default function LiveDashboardPage() {
                     heatmapCols={heatmapCols}
                     heatmapCells={heatmapCells}
                     obstaclePoints={obstaclePoints}
+                    obstacleCells={obstacleCells}
                     pointCloud={pointCloud}
                     connected={connected}
                   />

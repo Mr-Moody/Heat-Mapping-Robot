@@ -166,6 +166,26 @@ interface HeatmapPoint {
   color: number
 }
 
+interface ObstacleCuboidsProps {
+  cells: [number, number][]
+}
+
+function ObstacleCuboids({ cells }: ObstacleCuboidsProps) {
+  if (!cells || cells.length === 0) return null
+  const cellSize = 1
+  const height = 0.5
+  return (
+    <group>
+      {cells.map(([row, col], i) => (
+        <mesh key={i} position={[col + 0.5, height / 2, row + 0.5]}>
+          <boxGeometry args={[cellSize, height, cellSize]} />
+          <meshStandardMaterial color="#000000" />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
 interface ObstaclePointCloudProps {
   points: number[][]
 }
@@ -254,10 +274,11 @@ interface Scene3DProps {
   heatmapCols: number
   heatmapCells: Record<string, number>
   obstaclePoints: number[][]
+  obstacleCells: [number, number][]
   pointCloud: number[][]
 }
 
-function Scene3D({ state, trail, grid, rows, cols, heatmapRows, heatmapCols, heatmapCells = {}, obstaclePoints = [], pointCloud = [] }: Scene3DProps) {
+function Scene3D({ state, trail, grid, rows, cols, heatmapRows, heatmapCols, heatmapCells = {}, obstaclePoints = [], obstacleCells = [], pointCloud = [] }: Scene3DProps) {
   const heatmapPoints = useMemo(() => {
     const pts: HeatmapPoint[] = []
     if (!trail || trail.length === 0) return pts
@@ -315,6 +336,7 @@ function Scene3D({ state, trail, grid, rows, cols, heatmapRows, heatmapCols, hea
       <TrailLine trail={trail} />
       <ThermalPointCloud heatmapPoints={heatmapPoints} />
       <SimulatedPointCloud points={pointCloud} />
+      <ObstacleCuboids cells={obstacleCells} />
       <ObstaclePointCloud points={obstaclePoints} />
       <OrbitControls
         enableDamping
@@ -344,6 +366,7 @@ interface RobotScene3DProps {
   heatmapCols?: number
   heatmapCells?: Record<string, number>
   obstaclePoints?: number[][]
+  obstacleCells?: [number, number][]
   pointCloud?: number[][]
   connected?: boolean
 }
@@ -358,6 +381,7 @@ export default function RobotScene3D({
   heatmapCols = 0,
   heatmapCells = {},
   obstaclePoints = [],
+  obstacleCells = [],
   pointCloud = [],
   connected,
 }: RobotScene3DProps) {
@@ -412,6 +436,7 @@ export default function RobotScene3D({
           heatmapCols={heatmapCols}
           heatmapCells={heatmapCells}
           obstaclePoints={obstaclePoints}
+          obstacleCells={obstacleCells}
           pointCloud={pointCloud}
         />
       </Canvas>

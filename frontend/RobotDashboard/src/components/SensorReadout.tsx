@@ -3,6 +3,7 @@ interface SensorState {
   temperature_c?: number
   humidity_percent?: number
   room_id?: string
+  room_name?: string
 }
 
 interface LiveStatus {
@@ -65,7 +66,7 @@ export default function SensorReadout({ state, liveStatus }: SensorReadoutProps)
         <div className="flex flex-col gap-0.5">
           <span className="text-xs text-uber-gray-mid">Location</span>
           <span className="font-mono text-sm font-medium text-uber-gray-dark">
-            {state.room_id ?? 'corridor'}
+            {state.room_name ?? state.room_id ?? 'Corridor'}
           </span>
         </div>
       </div>
