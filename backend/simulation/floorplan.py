@@ -51,7 +51,7 @@ ROOM_CONFIGS = {
         name="Floor 8",
         cell_type=CellType.FLOOR,
         base_temp=20.0,
-        temp_range=(18.0, 22.5),
+        temp_range=(17.5, 23.0),
         base_humidity=48.0,
         humidity_range=(42, 56),
         volume_m3=280,
@@ -62,7 +62,7 @@ OBSTACLE_CELLS = frozenset({
     (3, 8), (4, 14), (5, 20), (6, 10), (6, 18),
 })
 
-ROOM_ID_TO_NAME: dict[str, str] = {r.id: r.name for r in ROOM_CONFIGS.values()}
+ROOM_ID_TO_NAME: dict[str, str] = {s["id"]: s["name"] for s in SPACES}
 
 
 def get_room_name(room_id: str | None) -> str:

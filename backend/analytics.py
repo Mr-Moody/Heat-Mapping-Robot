@@ -83,8 +83,8 @@ def compute_room_analytics(
         overheating = delta_t > 2.0
         ventilation_risk = variance > 1.0
         results.append({
-            "room_id": room.id,
-            "room_name": room.name,
+            "room_id": space["id"],
+            "room_name": space["name"],
             "avg_temperature_c": round(avg_temp, 2),
             "delta_t_from_setpoint": round(delta_t, 2),
             "wasted_power_w": round(wasted_power, 1),

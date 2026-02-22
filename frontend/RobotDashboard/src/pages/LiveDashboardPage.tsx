@@ -298,7 +298,7 @@ export default function LiveDashboardPage() {
 
           <aside className="relative z-10 flex flex-col gap-4 overflow-y-auto overflow-x-hidden min-w-0 shrink-0 px-2 py-1">
             <SensorReadout state={state} liveStatus={{ hasData, connected, liveOpacity }} />
-            <AnalyticsPanel rooms={rooms} />
+            <AnalyticsPanel rooms={rooms} robotRoomId={state?.room_id} />
             <Alerts rooms={rooms} />
           </aside>
           </>

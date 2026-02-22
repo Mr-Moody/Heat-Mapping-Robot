@@ -46,6 +46,11 @@ ROBOT_NAMES = {
     "robot-2": "Scout Beta",
     "robot-3": "Scout Gamma",
 }
+ROBOT_ROOM_ASSIGNMENTS = {
+    "robot-1": "floor_5",
+    "robot-2": "floor_6",
+    "robot-3": "floor_8",
+}
 # Distinct start positions for each robot
 ROBOT_STARTS = [
     (14.5, 5.0),
@@ -270,6 +275,7 @@ class SimulationEngine:
 
                 self._last_recorded_temp[rid] = temp
 
+                display_room_id = ROBOT_ROOM_ASSIGNMENTS.get(rid, room_id)
                 state = RobotState(
                     timestamp=time.time(),
                     x=robot.x,
@@ -278,7 +284,7 @@ class SimulationEngine:
                     ultrasonic_distance_cm=dist,
                     temperature_c=temp,
                     humidity_percent=hum,
-                    room_id=room_id,
+                    room_id=display_room_id,
                 )
 
                 q = self._state_queues[rid]

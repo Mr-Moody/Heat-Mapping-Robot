@@ -10,24 +10,31 @@ function CameraLookAt({ target }: { target: [number, number, number] }) {
   return null
 }
 function tempToColorHex(temp: number): number {
-  const t = Math.max(17, Math.min(24, temp))
-  const x = Math.pow((t - 17) / 7, 0.55)
+  const tMin = 14
+  const tMax = 23
+  const t = Math.max(tMin, Math.min(tMax, temp))
+  const x = (t - tMin) / (tMax - tMin)
   let r: number, g: number, b: number
-  if (x <= 0.33) {
-    const s = x / 0.33
-    r = Math.round(25 + (110 - 25) * s)
-    g = Math.round(120 + (195 - 120) * s)
-    b = Math.round(70 + (55 - 70) * s)
-  } else if (x <= 0.66) {
-    const s = (x - 0.33) / 0.33
-    r = Math.round(110 + (255 - 110) * s)
-    g = Math.round(195 + (200 - 195) * s)
-    b = Math.round(55 + (45 - 55) * s)
+  if (x <= 0.35) {
+    const s = x / 0.35
+    r = Math.round(40 + (60 - 40) * s)
+    g = Math.round(100 + (180 - 100) * s)
+    b = Math.round(200 + (140 - 200) * s)
+  } else if (x <= 0.6) {
+    const s = (x - 0.35) / 0.25
+    r = Math.round(60 + (140 - 60) * s)
+    g = Math.round(180 + (220 - 180) * s)
+    b = Math.round(140 + (80 - 140) * s)
+  } else if (x <= 0.85) {
+    const s = (x - 0.6) / 0.25
+    r = Math.round(140 + (255 - 140) * s)
+    g = Math.round(220 + (200 - 220) * s)
+    b = Math.round(80 + (50 - 80) * s)
   } else {
-    const s = (x - 0.66) / 0.34
+    const s = (x - 0.85) / 0.15
     r = 255
-    g = Math.round(200 + (70 - 200) * s)
-    b = Math.round(45 + (38 - 45) * s)
+    g = Math.round(200 + (80 - 200) * s)
+    b = Math.round(50 + (40 - 50) * s)
   }
   return (r << 16) | (g << 8) | b
 }

@@ -1,5 +1,5 @@
 interface RoomAnalytics {
-  room_id: number
+  room_id: number | string
   room_name: string
   avg_temperature_c: number
   delta_t_from_setpoint: number
@@ -11,14 +11,18 @@ interface RoomAnalytics {
 
 interface AnalyticsPanelProps {
   rooms: RoomAnalytics[] | null | undefined
+  robotRoomId?: string | null
 }
 
-export default function AnalyticsPanel({ rooms }: AnalyticsPanelProps) {
+export default function AnalyticsPanel({ rooms, robotRoomId }: AnalyticsPanelProps) {
+  const filtered = (rooms ?? [])
+    .filter((r) => !robotRoomId || String(r.room_id) === robotRoomId)
+    .filter((r, i, arr) => arr.findIndex((x) => String(x.room_id) === String(r.room_id)) === i)
   return (
     <div className="bg-uber-white/90 border border-uber-gray-light rounded-lg p-4 transition-transform duration-200 hover:scale-[1.01] hover:shadow-md origin-center">
       <h2 className="m-0 mb-4 text-base font-semibold text-uber-gray-dark">Space analytics</h2>
       <div className="flex flex-col gap-3">
-        {(rooms ?? []).map((r) => (
+        {filtered.map((r) => (
           <div
             key={r.room_id}
             className={`rounded-md border-l-4 bg-uber-white/60 p-3 transition-transform duration-200 hover:scale-[1.01] hover:shadow-md origin-center ${
