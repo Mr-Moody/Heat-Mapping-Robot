@@ -1,6 +1,6 @@
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Line } from '@react-three/drei'
-import { useMemo } from 'react'
+import { useMemo, useRef, useLayoutEffect } from 'react'
 import * as THREE from 'three'
 import { tempToColorHex } from '../utils/heatmapColors'
 
@@ -67,18 +67,21 @@ interface FloorGridProps {
   heatmapCells: Record<string, number>
 }
 
+const cellSize = 1
+const boxMatrix = new THREE.Matrix4()
+
 function FloorGrid({ grid, rows, cols, heatmapRows = 0, heatmapCols = 0, heatmapCells = {} }: FloorGridProps) {
-  const cellSize = 1
   const subdivR = heatmapRows > rows ? Math.floor(heatmapRows / rows) : 1
   const subdivC = heatmapCols > cols ? Math.floor(heatmapCols / cols) : 1
 
-  const cells = useMemo(() => {
-    const out: { row: number; col: number; cell: number; color: number }[] = []
+  const { boxCells, planeCells } = useMemo(() => {
+    const boxes: { row: number; col: number }[] = []
+    const planes: { row: number; col: number; color: number }[] = []
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < cols; col++) {
         const cell = grid[row]?.[col] ?? 0
-        const color = cell === 0 ? 0x1a2332 : UNEXPLORED_COLOR
-        let tempColor = color
+        const baseColor = cell === 0 ? 0x1a2332 : UNEXPLORED_COLOR
+        let tempColorVal = baseColor
         let sum = 0
         let n = 0
         for (let dr = 0; dr < subdivR; dr++) {
@@ -93,26 +96,42 @@ function FloorGrid({ grid, rows, cols, heatmapRows = 0, heatmapCols = 0, heatmap
           }
         }
         const temp = n > 0 ? sum / n : heatmapCells[`${row},${col}`]
-        if (temp != null && cell !== 0) tempColor = tempToColorHex(temp)
-        out.push({ row, col, cell, color: tempColor })
+        if (temp != null && cell !== 0) tempColorVal = tempToColorHex(temp)
+        if (cell === 0) {
+          boxes.push({ row, col })
+        } else {
+          planes.push({ row, col, color: tempColorVal })
+        }
       }
     }
-    return out
+    return { boxCells: boxes, planeCells: planes }
   }, [grid, rows, cols, heatmapRows, heatmapCols, subdivR, subdivC, heatmapCells])
+
+  const boxRef = useRef<THREE.InstancedMesh>(null)
+  const boxGeo = useMemo(() => new THREE.BoxGeometry(cellSize, 0.5, cellSize), [])
+  const boxMat = useMemo(() => new THREE.MeshStandardMaterial({ color: 0x1a2332 }), [])
+
+  useLayoutEffect(() => {
+    if (!boxRef.current || boxCells.length === 0) return
+    boxCells.forEach(({ row, col }, i) => {
+      const x = col * cellSize + cellSize / 2
+      const z = row * cellSize + cellSize / 2
+      boxMatrix.setPosition(x, 0.25, z)
+      boxRef.current!.setMatrixAt(i, boxMatrix)
+    })
+    boxRef.current.instanceMatrix.needsUpdate = true
+  }, [boxCells])
+
+  if (boxCells.length === 0 && planeCells.length === 0) return null
 
   return (
     <group>
-      {cells.map(({ row, col, cell, color }) => {
+      {boxCells.length > 0 && (
+        <instancedMesh ref={boxRef} args={[boxGeo, boxMat, boxCells.length]} frustumCulled={false} />
+      )}
+      {planeCells.map(({ row, col, color }) => {
         const x = col * cellSize + cellSize / 2
         const z = row * cellSize + cellSize / 2
-        if (cell === 0) {
-          return (
-            <mesh key={`${row}-${col}`} position={[x, 0.25, z]}>
-              <boxGeometry args={[cellSize, 0.5, cellSize]} />
-              <meshStandardMaterial color={0x1a2332} />
-            </mesh>
-          )
-        }
         return (
           <mesh key={`${row}-${col}`} position={[x, 0.002, z]} rotation={[-Math.PI / 2, 0, 0]}>
             <planeGeometry args={[cellSize, cellSize]} />
@@ -148,19 +167,27 @@ interface ObstacleCuboidsProps {
   cells: [number, number][]
 }
 
+const obstacleMatrix = new THREE.Matrix4()
+
 function ObstacleCuboids({ cells }: ObstacleCuboidsProps) {
-  if (!cells || cells.length === 0) return null
+  const meshRef = useRef<THREE.InstancedMesh>(null)
   const halfCellSize = 0.5
   const height = 0.5
+  const obstacleGeo = useMemo(() => new THREE.BoxGeometry(halfCellSize, height, halfCellSize), [])
+  const obstacleMat = useMemo(() => new THREE.MeshStandardMaterial({ color: 0x000000 }), [])
+
+  useLayoutEffect(() => {
+    if (!meshRef.current || !cells?.length) return
+    cells.forEach(([row, col], i) => {
+      obstacleMatrix.setPosition(col + 0.5, height / 2, row + 0.5)
+      meshRef.current!.setMatrixAt(i, obstacleMatrix)
+    })
+    meshRef.current.instanceMatrix.needsUpdate = true
+  }, [cells])
+
+  if (!cells || cells.length === 0) return null
   return (
-    <group>
-      {cells.map(([row, col], i) => (
-        <mesh key={i} position={[col + 0.5, height / 2, row + 0.5]}>
-          <boxGeometry args={[halfCellSize, height, halfCellSize]} />
-          <meshStandardMaterial color="#000000" />
-        </mesh>
-      ))}
-    </group>
+    <instancedMesh ref={meshRef} args={[obstacleGeo, obstacleMat, cells.length]} frustumCulled={false} />
   )
 }
 

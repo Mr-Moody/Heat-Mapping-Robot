@@ -16,8 +16,8 @@ export default function Layout({ children }: LayoutProps) {
 
   return (
     <div className="min-h-screen flex flex-col bg-uber-black">
-      <header className="bg-uber-white border-b border-uber-gray-light text-uber-gray-dark px-4 sm:px-6 py-4">
-        <nav className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 max-w-6xl mx-auto">
+      <header className="bg-uber-white border-b border-uber-gray-light text-uber-gray-dark pl-3 sm:pl-4 pr-4 sm:pr-6 py-4">
+        <nav className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <Link to="/" className="flex items-center gap-2 sm:gap-3 text-lg font-medium tracking-tight">
             <img src="/thermoscout_logo.png" alt="ThermalScout" className="h-8 w-auto" />
             <span className="text-cyan-400">ThermalScout</span>
