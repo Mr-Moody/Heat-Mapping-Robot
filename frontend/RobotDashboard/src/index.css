@@ -1,3 +1,14 @@
+@import "tailwindcss";
+
+@theme {
+  /* Reference design colors - dark theme */
+  --color-uber-white: #1a2332;
+  --color-uber-black: #0f1419;
+  --color-uber-gray-light: #30363d;
+  --color-uber-gray-mid: #8b949e;
+  --color-uber-gray-dark: #e6edf3;
+}
+
 :root {
   --bg-dark: #0f1419;
   --bg-panel: #1a2332;
