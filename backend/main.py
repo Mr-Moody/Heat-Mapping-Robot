@@ -257,8 +257,8 @@ def get_current(robot_id: str | None = None):
     if rid == PHYSICAL_ROBOT_ID and _latest_arduino_update:
         u = _latest_arduino_update
         robot = u.get("robot") or {}
-        arduino_x, arduino_y = robot.get("x", 0), robot.get("y", 0)
-        floor_x, floor_y = _arduino_to_floor_position(arduino_x, arduino_y)
+        # Physical robot is stationary; fix 3D position to arena center
+        floor_x, floor_y = _arduino_to_floor_position(0, 0)
         return {
             "robot_id": rid,
             "position": {"x": floor_x, "y": floor_y, "theta": robot.get("heading_deg", 0) * 3.14159 / 180},
@@ -478,9 +478,8 @@ def _frontend_update_to_robot_update(update: dict) -> dict:
             fx, fy = _arduino_to_floor_position(float(p[0]), float(p[2]))
             point_cloud.append([fx, float(p[1]), fy])
     trail: list[list[float]] = []
-    arduino_x = robot.get("x", 0)
-    arduino_y = robot.get("y", 0)
-    floor_x, floor_y = _arduino_to_floor_position(arduino_x, arduino_y)
+    # Physical robot is stationary; fix 3D position to arena center
+    floor_x, floor_y = _arduino_to_floor_position(0, 0)
     return {
         "type": "robot_update",
         "robot_id": PHYSICAL_ROBOT_ID,
