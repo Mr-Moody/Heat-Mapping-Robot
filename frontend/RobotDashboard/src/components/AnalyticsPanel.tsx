@@ -15,13 +15,13 @@ interface AnalyticsPanelProps {
 
 export default function AnalyticsPanel({ rooms }: AnalyticsPanelProps) {
   return (
-    <div className="bg-uber-white/90 border border-uber-gray-light rounded-lg p-4 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg">
+    <div className="bg-uber-white/90 border border-uber-gray-light rounded-lg p-4 transition-transform duration-200 hover:scale-[1.01] hover:shadow-md origin-center">
       <h2 className="m-0 mb-4 text-base font-semibold text-uber-gray-dark">Space analytics</h2>
       <div className="flex flex-col gap-3">
         {(rooms ?? []).map((r) => (
           <div
             key={r.room_id}
-            className={`rounded-md border-l-4 bg-uber-white/60 p-3 transition-all duration-200 hover:scale-[1.04] hover:shadow-lg ${
+            className={`rounded-md border-l-4 bg-uber-white/60 p-3 transition-transform duration-200 hover:scale-[1.01] hover:shadow-md origin-center ${
               r.energy_waste_risk ? 'border-l-amber-500' : 'border-l-uber-gray-light'
             }`}
           >

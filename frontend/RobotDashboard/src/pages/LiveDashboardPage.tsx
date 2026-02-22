@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import LiveMap from '../components/LiveMap'
 import RobotScene3D from '../components/RobotScene3D'
 import AnalyticsPanel from '../components/AnalyticsPanel'
@@ -28,8 +28,6 @@ interface RoomAnalytics {
   energy_waste_risk?: boolean
 }
 
-type ExpandedCard = 'sensors' | 'analytics' | null
-
 export default function LiveDashboardPage() {
   const [state, setState] = useState<RobotState | null>(null)
   const [rooms, setRooms] = useState<RoomAnalytics[]>([])
@@ -42,36 +40,6 @@ export default function LiveDashboardPage() {
   const [heatmapCols, setHeatmapCols] = useState(0)
   const [connected, setConnected] = useState(false)
   const [viewMode, setViewMode] = useState<'2d' | '3d'>('3d')
-  const [expandedCard, setExpandedCard] = useState<ExpandedCard>(null)
-  const [closingCard, setClosingCard] = useState<ExpandedCard>(null)
-  const [overlayReady, setOverlayReady] = useState(false)
-  const overlayCardRef = useRef<HTMLDivElement>(null)
-
-  const showOverlay = !!(expandedCard || closingCard)
-  const overlayCardType = expandedCard || closingCard
-
-  useEffect(() => {
-    if (!expandedCard) {
-      setOverlayReady(false)
-      return
-    }
-    const id = requestAnimationFrame(() => {
-      requestAnimationFrame(() => setOverlayReady(true))
-    })
-    return () => cancelAnimationFrame(id)
-  }, [expandedCard])
-
-  const handleCloseOverlay = () => {
-    if (expandedCard && !closingCard) {
-      setClosingCard(expandedCard)
-      setExpandedCard(null)
-    }
-  }
-
-  const handleOverlayTransitionEnd = (e: React.TransitionEvent) => {
-    if (e.target !== overlayCardRef.current || e.propertyName !== 'transform') return
-    if (closingCard) setClosingCard(null)
-  }
 
   useEffect(() => {
     const ws = new WebSocket(WS_URL + '/ws/live')
@@ -201,48 +169,12 @@ export default function LiveDashboardPage() {
           </div>
         </section>
 
-        <aside className="relative z-10 flex flex-col gap-4 overflow-y-auto overflow-x-visible min-w-0 shrink-0">
-          <div
-            className="cursor-pointer"
-            onMouseEnter={() => !closingCard && setExpandedCard('sensors')}
-          >
-            <SensorReadout state={state} />
-          </div>
-          <div
-            className="cursor-pointer"
-            onMouseEnter={() => !closingCard && setExpandedCard('analytics')}
-          >
-            <AnalyticsPanel rooms={rooms} />
-          </div>
+        <aside className="relative z-10 flex flex-col gap-4 overflow-y-auto overflow-x-hidden min-w-0 shrink-0 px-2 py-1">
+          <SensorReadout state={state} />
+          <AnalyticsPanel rooms={rooms} />
           <Alerts rooms={rooms} />
         </aside>
       </main>
-
-      {showOverlay && (
-        <div
-          className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/20 cursor-pointer"
-          onClick={handleCloseOverlay}
-          onKeyDown={(e) => e.key === 'Escape' && handleCloseOverlay()}
-          role="button"
-          tabIndex={0}
-          aria-label="Close overlay"
-        >
-          <div
-            ref={overlayCardRef}
-            className={`fixed left-1/2 top-1/2 w-80 max-w-[calc(100vw-2rem)] z-[9999] pointer-events-auto rounded-lg overflow-hidden transition-[transform,box-shadow] duration-[450ms] ease-[cubic-bezier(0.34,1.2,0.64,1)] shadow-[0_24px_56px_rgba(0,0,0,0.42)] ${
-              expandedCard && overlayReady
-                ? 'translate-x-[-50%] translate-y-[-50%] scale-[1.4] shadow-[0_28px_64px_rgba(0,0,0,0.5)]'
-                : closingCard
-                  ? 'translate-x-[55%] translate-y-[-50%] scale-[0.92]'
-                  : 'translate-x-[55%] translate-y-[-50%] scale-[0.92]'
-            }`}
-            onTransitionEnd={handleOverlayTransitionEnd}
-          >
-            {overlayCardType === 'sensors' && <SensorReadout state={state} />}
-            {overlayCardType === 'analytics' && <AnalyticsPanel rooms={rooms} />}
-          </div>
-        </div>
-      )}
     </div>
   )
 }

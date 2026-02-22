@@ -12,14 +12,14 @@ interface SensorReadoutProps {
 export default function SensorReadout({ state }: SensorReadoutProps) {
   if (!state) {
     return (
-      <div className="bg-uber-white/90 border border-uber-gray-light rounded-lg p-4 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg">
+      <div className="bg-uber-white/90 border border-uber-gray-light rounded-lg p-4 transition-transform duration-200 hover:scale-[1.01] hover:shadow-md origin-center">
         <h3 className="m-0 mb-3 text-base font-semibold text-uber-gray-dark">Live Sensors</h3>
         <p className="text-sm text-uber-gray-mid">Waiting for data…</p>
       </div>
     )
   }
   return (
-    <div className="bg-uber-white/90 border border-uber-gray-light rounded-lg p-4 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg">
+    <div className="bg-uber-white/90 border border-uber-gray-light rounded-lg p-4 transition-transform duration-200 hover:scale-[1.01] hover:shadow-md origin-center">
       <h3 className="m-0 mb-3 text-base font-semibold text-uber-gray-dark">Live Sensors</h3>
       <div className="grid grid-cols-2 gap-2">
         <div className="flex flex-col gap-0.5">
