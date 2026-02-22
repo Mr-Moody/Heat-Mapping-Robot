@@ -105,3 +105,9 @@ async def websocket_live(ws: WebSocket):
             await asyncio.sleep(0.15)
     except WebSocketDisconnect:
         pass
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
