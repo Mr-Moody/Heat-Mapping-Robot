@@ -6,6 +6,7 @@ import Alerts from '../components/Alerts'
 import SensorReadout from '../components/SensorReadout'
 import DashboardSkeleton from '../components/DashboardSkeleton'
 import RobotListPanel from '../components/RobotListPanel'
+import MainContentSkeleton from '../components/MainContentSkeleton'
 import type { RobotInfo } from '../components/RobotCard'
 
 const WS_URL =
@@ -50,6 +51,7 @@ export default function LiveDashboardPage() {
   const [robots, setRobots] = useState<RobotInfo[]>([])
   const [selectedRobotId, setSelectedRobotId] = useState<string | null>(null)
   const [robotStates, setRobotStates] = useState<Record<string, RobotState | null>>({})
+  const [isLoadingSelectedRobot, setIsLoadingSelectedRobot] = useState(false)
 
   useEffect(() => {
     const ready = connected || grid.length > 0 || (state?.position != null) || rooms.length > 0
@@ -60,8 +62,15 @@ export default function LiveDashboardPage() {
     if (robots.length > 0 && !selectedRobotId) {
       const firstActive = robots.find((r) => r.active) ?? robots[0]
       setSelectedRobotId(firstActive.id)
+      setIsLoadingSelectedRobot(true)
     }
   }, [robots, selectedRobotId])
+
+  const handleSelectRobot = (id: string) => {
+    if (id === selectedRobotId) return
+    setSelectedRobotId(id)
+    setIsLoadingSelectedRobot(true)
+  }
 
   useEffect(() => {
     if (selectedRobotId && robotStates[selectedRobotId]) {
@@ -124,6 +133,7 @@ export default function LiveDashboardPage() {
             if (data.heatmap_cols != null) setHeatmapCols(data.heatmap_cols)
             if (Array.isArray(data.obstacle_points)) setObstaclePoints(data.obstacle_points)
             if (Array.isArray(data.point_cloud)) setPointCloud(data.point_cloud)
+            setIsLoadingSelectedRobot(false)
           }
         }
       } catch {
@@ -150,6 +160,7 @@ export default function LiveDashboardPage() {
             if (Array.isArray(d.obstacle_points)) setObstaclePoints(d.obstacle_points)
             if (Array.isArray(d.point_cloud)) setPointCloud(d.point_cloud)
           }
+          setIsLoadingSelectedRobot(false)
         })
         .catch(() => {})
 
@@ -169,6 +180,7 @@ export default function LiveDashboardPage() {
             if (d.robot_id) {
               setRobotStates((prev) => ({ ...prev, [d.robot_id!]: s }))
             }
+            setIsLoadingSelectedRobot(false)
           }
         })
         .catch(() => {})
@@ -204,7 +216,7 @@ export default function LiveDashboardPage() {
             <RobotListPanel
               robots={robots}
               selectedRobotId={selectedRobotId}
-              onSelectRobot={setSelectedRobotId}
+              onSelectRobot={handleSelectRobot}
               robotStates={robotStates}
               grid={grid}
               heatmapCells={heatmapCells}
@@ -214,6 +226,10 @@ export default function LiveDashboardPage() {
               heatmapCols={heatmapCols}
             />
           )}
+          {isLoadingSelectedRobot ? (
+            <MainContentSkeleton />
+          ) : (
+          <>
           <section className="relative z-0 bg-[#1a2332] rounded-lg border border-[#30363d] overflow-hidden min-h-[400px] flex flex-col">
             <div className="flex gap-0 p-1 pt-1 pr-1 pl-1 pb-0 bg-[#243044] border-b border-[#30363d]">
               <button
@@ -278,6 +294,8 @@ export default function LiveDashboardPage() {
             <AnalyticsPanel rooms={rooms} />
             <Alerts rooms={rooms} />
           </aside>
+          </>
+          )}
         </main>
       ) : (
         <DashboardSkeleton />

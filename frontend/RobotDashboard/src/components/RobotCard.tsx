@@ -1,4 +1,4 @@
-import RobotThumbnail3D from './RobotThumbnail3D'
+import RobotProfileImage from './RobotProfileImage'
 
 export interface RobotInfo {
   id: string
@@ -46,7 +46,8 @@ export default function RobotCard({
       }`}
     >
       <div className="p-1">
-        <RobotThumbnail3D
+        <RobotProfileImage
+          robotId={robot.id}
           robotState={robotState}
           grid={grid}
           heatmapCells={heatmapCells}

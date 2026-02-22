@@ -27,10 +27,9 @@ export default function RobotListPanel({
 }: RobotListPanelProps) {
   if (robots.length === 0) return null
 
-  const sortedRobots = [...robots].sort((a, b) => {
-    if (a.active !== b.active) return a.active ? -1 : 1
-    return (b.last_seen ?? 0) - (a.last_seen ?? 0)
-  })
+  const sortedRobots = [...robots].sort((a, b) =>
+    (a.name ?? a.id).localeCompare(b.name ?? b.id, undefined, { sensitivity: 'base' })
+  )
 
   return (
     <aside className="flex flex-col gap-3 overflow-y-auto min-w-[200px] w-[200px] shrink-0 py-2">
