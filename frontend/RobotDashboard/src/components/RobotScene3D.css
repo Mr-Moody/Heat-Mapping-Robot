@@ -1,0 +1,43 @@
+.robot-scene-3d {
+  position: relative;
+  width: 100%;
+  min-height: 450px;
+  height: 450px;
+  background: #0f1419;
+}
+
+.robot-scene-3d canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 450px;
+}
+
+.robot-scene-overlay {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  z-index: 10;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  background: rgba(26, 35, 50, 0.9);
+  padding: 8px 12px;
+  border-radius: 6px;
+}
+
+.robot-scene-sensors {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  z-index: 10;
+  display: flex;
+  gap: 16px;
+  font-size: 0.75rem;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--accent-cyan);
+  background: rgba(26, 35, 50, 0.9);
+  padding: 6px 10px;
+  border-radius: 6px;
+}

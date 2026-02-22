@@ -1,0 +1,47 @@
+.sensor-readout {
+  background: var(--bg-panel);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  padding: 1rem;
+  position: relative;
+  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+}
+
+.sensor-readout:hover {
+  transform: scale(1.02);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.sensor-readout h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.sensor-readout .muted {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.sensors {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+}
+
+.sensor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.sensor .label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.sensor .value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.9rem;
+  font-weight: 500;
+}

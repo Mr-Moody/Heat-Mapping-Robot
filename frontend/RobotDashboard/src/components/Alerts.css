@@ -1,0 +1,27 @@
+.alerts {
+  background: var(--bg-panel);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  padding: 1rem;
+}
+
+.alerts h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.alerts ul {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.alert-item {
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+  color: var(--accent-amber);
+}
+
+.alert-item strong {
+  color: var(--text-primary);
+}
