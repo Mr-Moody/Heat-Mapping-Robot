@@ -1,0 +1,248 @@
+import { useState, useEffect, useRef } from 'react'
+import LiveMap from '../components/LiveMap'
+import RobotScene3D from '../components/RobotScene3D'
+import AnalyticsPanel from '../components/AnalyticsPanel'
+import Alerts from '../components/Alerts'
+import SensorReadout from '../components/SensorReadout'
+
+const WS_URL = import.meta.env.DEV
+  ? 'ws://localhost:8000'
+  : (location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + location.host
+
+interface RobotState {
+  position?: { x: number; y: number; theta?: number }
+  ultrasonic_distance_cm?: number
+  temperature_c?: number
+  humidity_percent?: number
+  room_id?: string
+}
+
+interface RoomAnalytics {
+  room_id: number
+  room_name: string
+  avg_temperature_c: number
+  delta_t_from_setpoint: number
+  wasted_power_w: number
+  humidity_percent: number
+  sustainability_score: number
+  energy_waste_risk?: boolean
+}
+
+type ExpandedCard = 'sensors' | 'analytics' | null
+
+export default function LiveDashboardPage() {
+  const [state, setState] = useState<RobotState | null>(null)
+  const [rooms, setRooms] = useState<RoomAnalytics[]>([])
+  const [trail, setTrail] = useState<[number, number][]>([])
+  const [grid, setGrid] = useState<number[][]>([])
+  const [rows, setRows] = useState(0)
+  const [cols, setCols] = useState(0)
+  const [heatmapCells, setHeatmapCells] = useState<Record<string, number>>({})
+  const [heatmapRows, setHeatmapRows] = useState(0)
+  const [heatmapCols, setHeatmapCols] = useState(0)
+  const [connected, setConnected] = useState(false)
+  const [viewMode, setViewMode] = useState<'2d' | '3d'>('3d')
+  const [expandedCard, setExpandedCard] = useState<ExpandedCard>(null)
+  const [closingCard, setClosingCard] = useState<ExpandedCard>(null)
+  const [overlayReady, setOverlayReady] = useState(false)
+  const overlayCardRef = useRef<HTMLDivElement>(null)
+
+  const showOverlay = !!(expandedCard || closingCard)
+  const overlayCardType = expandedCard || closingCard
+
+  useEffect(() => {
+    if (!expandedCard) {
+      setOverlayReady(false)
+      return
+    }
+    const id = requestAnimationFrame(() => {
+      requestAnimationFrame(() => setOverlayReady(true))
+    })
+    return () => cancelAnimationFrame(id)
+  }, [expandedCard])
+
+  const handleCloseOverlay = () => {
+    if (expandedCard && !closingCard) {
+      setClosingCard(expandedCard)
+      setExpandedCard(null)
+    }
+  }
+
+  const handleOverlayTransitionEnd = (e: React.TransitionEvent) => {
+    if (e.target !== overlayCardRef.current || e.propertyName !== 'transform') return
+    if (closingCard) setClosingCard(null)
+  }
+
+  useEffect(() => {
+    const ws = new WebSocket(WS_URL + '/ws/live')
+    ws.onopen = () => setConnected(true)
+    ws.onclose = () => setConnected(false)
+    ws.onerror = () => setConnected(false)
+    ws.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data)
+        if (data.type === 'analytics') {
+          setRooms(data.rooms || [])
+          setTrail(data.trail || [])
+          if (data.heatmap_cells) setHeatmapCells(data.heatmap_cells)
+          if (data.heatmap_rows != null) setHeatmapRows(data.heatmap_rows)
+          if (data.heatmap_cols != null) setHeatmapCols(data.heatmap_cols)
+        } else if (data.position) {
+          setState(data)
+        } else {
+          setState(data)
+        }
+      } catch {
+        // ignore parse errors
+      }
+    }
+    return () => ws.close()
+  }, [])
+
+  useEffect(() => {
+    const fetchData = () => {
+      fetch('/api/map')
+        .then((r) => r.json())
+        .then((d: { grid?: number[][]; rows?: number; cols?: number; trail?: [number, number][]; heatmap_cells?: Record<string, number>; heatmap_rows?: number; heatmap_cols?: number }) => {
+          setGrid(d.grid || [])
+          setRows(d.rows || 0)
+          setCols(d.cols || 0)
+          if (!connected) setTrail(d.trail || [])
+          if (d.heatmap_cells) setHeatmapCells(d.heatmap_cells)
+          if (d.heatmap_rows != null) setHeatmapRows(d.heatmap_rows)
+          if (d.heatmap_cols != null) setHeatmapCols(d.heatmap_cols)
+        })
+        .catch(() => {})
+      if (!connected) {
+        fetch('/api/current')
+          .then((r) => r.json())
+          .then((d: { position?: { x: number; y: number; theta?: number } }) => {
+            if (d.position) setState(d)
+          })
+          .catch(() => {})
+        fetch('/api/rooms')
+          .then((r) => r.json())
+          .then((d: { rooms?: RoomAnalytics[] }) => {
+            if (d.rooms?.length) setRooms(d.rooms)
+          })
+          .catch(() => {})
+      }
+    }
+    fetchData()
+    const id = setInterval(fetchData, 400)
+    return () => clearInterval(id)
+  }, [connected])
+
+  return (
+    <div className="flex flex-col min-h-[calc(100vh-4rem)]">
+      <header className="px-4 sm:px-6 py-4 bg-[#1a2332] border-b border-[#30363d] flex flex-wrap items-center gap-4">
+        <h1 className="m-0 text-xl font-bold text-cyan-400">ThermalScout</h1>
+        <span className="text-sm text-uber-gray-mid">Autonomous Radiator Thermal Mapping</span>
+        <div className={`ml-auto font-mono text-sm ${connected ? 'text-cyan-400' : 'text-uber-gray-mid'}`}>
+          {connected ? '● LIVE' : '○ Disconnected'}
+        </div>
+      </header>
+
+      <main className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4 p-4 overflow-visible">
+        <section className="relative z-0 bg-[#1a2332] rounded-lg border border-[#30363d] overflow-hidden min-h-[400px] flex flex-col">
+          <div className="flex gap-0 p-1 pt-1 pr-1 pl-1 pb-0 bg-[#243044] border-b border-[#30363d]">
+            <button
+              type="button"
+              className={`flex-1 py-2 px-3 text-sm font-medium border-none rounded-t-lg transition-all duration-150 cursor-pointer ${
+                viewMode === '2d'
+                  ? 'bg-[#1a2332] text-cyan-400'
+                  : 'bg-transparent text-uber-gray-mid hover:text-uber-gray-dark'
+              }`}
+              onClick={() => setViewMode('2d')}
+            >
+              2D Map
+            </button>
+            <button
+              type="button"
+              className={`flex-1 py-2 px-3 text-sm font-medium border-none rounded-t-lg transition-all duration-150 cursor-pointer ${
+                viewMode === '3d'
+                  ? 'bg-[#1a2332] text-cyan-400'
+                  : 'bg-transparent text-uber-gray-mid hover:text-uber-gray-dark'
+              }`}
+              onClick={() => setViewMode('3d')}
+            >
+              3D Robot
+            </button>
+          </div>
+          <div className="flex-1 min-h-[450px] flex flex-col">
+            {viewMode === '2d' ? (
+              <div className="flex-1">
+                <LiveMap
+                  grid={grid}
+                  rows={rows}
+                  cols={cols}
+                  heatmapRows={heatmapRows}
+                  heatmapCols={heatmapCols}
+                  state={state}
+                  trail={trail}
+                  heatmapCells={heatmapCells}
+                />
+              </div>
+            ) : (
+              <div className="flex-1 min-h-[450px]">
+                <RobotScene3D
+                  state={state}
+                  trail={trail}
+                  grid={grid}
+                  rows={rows}
+                  cols={cols}
+                  heatmapRows={heatmapRows}
+                  heatmapCols={heatmapCols}
+                  heatmapCells={heatmapCells}
+                  connected={connected}
+                />
+              </div>
+            )}
+          </div>
+        </section>
+
+        <aside className="relative z-10 flex flex-col gap-4 overflow-y-auto overflow-x-visible min-w-0 shrink-0">
+          <div
+            className="cursor-pointer"
+            onMouseEnter={() => !closingCard && setExpandedCard('sensors')}
+          >
+            <SensorReadout state={state} />
+          </div>
+          <div
+            className="cursor-pointer"
+            onMouseEnter={() => !closingCard && setExpandedCard('analytics')}
+          >
+            <AnalyticsPanel rooms={rooms} />
+          </div>
+          <Alerts rooms={rooms} />
+        </aside>
+      </main>
+
+      {showOverlay && (
+        <div
+          className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/20 cursor-pointer"
+          onClick={handleCloseOverlay}
+          onKeyDown={(e) => e.key === 'Escape' && handleCloseOverlay()}
+          role="button"
+          tabIndex={0}
+          aria-label="Close overlay"
+        >
+          <div
+            ref={overlayCardRef}
+            className={`fixed left-1/2 top-1/2 w-80 max-w-[calc(100vw-2rem)] z-[9999] pointer-events-auto rounded-lg overflow-hidden transition-[transform,box-shadow] duration-[450ms] ease-[cubic-bezier(0.34,1.2,0.64,1)] shadow-[0_24px_56px_rgba(0,0,0,0.42)] ${
+              expandedCard && overlayReady
+                ? 'translate-x-[-50%] translate-y-[-50%] scale-[1.4] shadow-[0_28px_64px_rgba(0,0,0,0.5)]'
+                : closingCard
+                  ? 'translate-x-[55%] translate-y-[-50%] scale-[0.92]'
+                  : 'translate-x-[55%] translate-y-[-50%] scale-[0.92]'
+            }`}
+            onTransitionEnd={handleOverlayTransitionEnd}
+          >
+            {overlayCardType === 'sensors' && <SensorReadout state={state} />}
+            {overlayCardType === 'analytics' && <AnalyticsPanel rooms={rooms} />}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

@@ -1,20 +1,9 @@
 import { useEffect, useRef, useCallback } from 'react'
-import './LiveMap.css'
 
-const CELL_COLORS = {
-  0: '#1a2332',
-  1: '#243044',
-  2: '#2d3a4d',
-  3: '#364556',
-  4: '#3d4f5f',
-  5: '#465968',
-}
-
-// Sensitive gradient: 17–24°C, steep response so small temp changes are visible (power 0.55)
-function tempToColor(temp) {
+function tempToColor(temp: number): { r: number; g: number; b: number } {
   const t = Math.max(17, Math.min(24, temp))
   const x = Math.pow((t - 17) / 7, 0.55)
-  let r, g, b
+  let r: number, g: number, b: number
   if (x <= 0.33) {
     const s = x / 0.33
     r = Math.round(25 + (110 - 25) * s)
@@ -34,11 +23,19 @@ function tempToColor(temp) {
   return { r, g, b }
 }
 
-// Tighter blend so measured temps show more local variation (more sensitive)
 const SMOOTH_SIGMA = 0.48
 const SMOOTH_RADIUS = 1.5
 
-function sampleTempSmooth(cx, cy, heatRows, heatCols, grid, gridRows, gridCols, heatmapCells) {
+function sampleTempSmooth(
+  cx: number,
+  cy: number,
+  heatRows: number,
+  heatCols: number,
+  grid: number[][],
+  gridRows: number,
+  gridCols: number,
+  heatmapCells: Record<string, number>
+): number | null {
   const r0 = Math.max(0, Math.floor(cy - SMOOTH_RADIUS))
   const r1 = Math.min(heatRows - 1, Math.ceil(cy + SMOOTH_RADIUS))
   const c0 = Math.max(0, Math.floor(cx - SMOOTH_RADIUS))
@@ -47,13 +44,13 @@ function sampleTempSmooth(cx, cy, heatRows, heatCols, grid, gridRows, gridCols, 
   let weight = 0
   for (let r = r0; r <= r1; r++) {
     for (let c = c0; c <= c1; c++) {
-      const coarseR = gridRows ? Math.floor(r * gridRows / heatRows) : r
-      const coarseC = gridCols ? Math.floor(c * gridCols / heatCols) : c
+      const coarseR = gridRows ? Math.floor((r * gridRows) / heatRows) : r
+      const coarseC = gridCols ? Math.floor((c * gridCols) / heatCols) : c
       if (grid?.[coarseR]?.[coarseC] === 0) continue
       const t = heatmapCells[`${r},${c}`]
       if (t == null) continue
-      const dr = (r + 0.5) - cy
-      const dc = (c + 0.5) - cx
+      const dr = r + 0.5 - cy
+      const dc = c + 0.5 - cx
       const d2 = dr * dr + dc * dc
       const w = Math.exp(-d2 / (2 * SMOOTH_SIGMA * SMOOTH_SIGMA))
       sum += t * w
@@ -64,12 +61,36 @@ function sampleTempSmooth(cx, cy, heatRows, heatCols, grid, gridRows, gridCols, 
   return sum / weight
 }
 
-export default function LiveMap({ grid, rows, cols, heatmapRows, heatmapCols, state, trail, heatmapCells = {} }) {
-  const canvasRef = useRef(null)
+interface LiveMapState {
+  position?: { x: number; y: number }
+}
+
+interface LiveMapProps {
+  grid: number[][]
+  rows: number
+  cols: number
+  heatmapRows?: number
+  heatmapCols?: number
+  state?: LiveMapState | null
+  trail?: [number, number][] | null
+  heatmapCells?: Record<string, number>
+}
+
+export default function LiveMap({
+  grid,
+  rows,
+  cols,
+  heatmapRows,
+  heatmapCols,
+  state,
+  trail,
+  heatmapCells = {},
+}: LiveMapProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
   const PIXELS_PER_CELL = 20
   const scale = Math.min(2.5, Math.max(1, (typeof window !== 'undefined' && window.devicePixelRatio) || 1))
-  const hRows = heatmapRows > 0 ? heatmapRows : rows
-  const hCols = heatmapCols > 0 ? heatmapCols : cols
+  const hRows = (heatmapRows ?? 0) > 0 ? heatmapRows! : rows
+  const hCols = (heatmapCols ?? 0) > 0 ? heatmapCols! : cols
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current
@@ -83,19 +104,20 @@ export default function LiveMap({ grid, rows, cols, heatmapRows, heatmapCols, st
       canvas.height = h
     }
     const ctx = canvas.getContext('2d')
+    if (!ctx) return
     const imageData = ctx.createImageData(w, h)
     const data = imageData.data
 
     for (let py = 0; py < h; py++) {
       for (let px = 0; px < w; px++) {
-        const cx = (px + 0.5) / w * cols
-        const cy = (py + 0.5) / h * rows
+        const cx = ((px + 0.5) / w) * cols
+        const cy = ((py + 0.5) / h) * rows
         const r0 = Math.floor(cy)
         const c0 = Math.floor(cx)
         const cell = grid[r0]?.[c0] ?? 0
-        const fineCx = (px + 0.5) / w * hCols
-        const fineCy = (py + 0.5) / h * hRows
-        let r, g, b
+        const fineCx = ((px + 0.5) / w) * hCols
+        const fineCy = ((py + 0.5) / h) * hRows
+        let r: number, g: number, b: number
         if (cell === 0) {
           r = 0x1a
           g = 0x23
@@ -122,8 +144,6 @@ export default function LiveMap({ grid, rows, cols, heatmapRows, heatmapCols, st
     }
     ctx.putImageData(imageData, 0, 0)
 
-    const cellW = w / cols
-    const cellH = h / rows
     if (trail && trail.length > 1) {
       ctx.strokeStyle = 'rgba(0, 212, 170, 0.55)'
       ctx.lineWidth = 2.5
@@ -160,18 +180,30 @@ export default function LiveMap({ grid, rows, cols, heatmapRows, heatmapCols, st
   const canvasW = Math.max(1, cols) * res
   const canvasH = Math.max(1, rows) * res
   return (
-    <div className="live-map">
+    <div className="relative w-full h-full min-h-[260px] flex items-center justify-center">
       <canvas
         ref={canvasRef}
         width={canvasW}
         height={canvasH}
-        style={{ width: '100%', height: 'auto', display: 'block', objectFit: 'contain' }}
+        className="max-w-full max-h-full w-auto h-auto object-contain"
       />
-      <div className="map-legend">
-        <span><span className="swatch unexplored" /> Unexplored</span>
-        <span><span className="swatch cold" /> Cool</span>
-        <span><span className="swatch mid" /> Warm</span>
-        <span><span className="swatch hot" /> Hot</span>
+      <div className="absolute bottom-3 left-3 flex gap-4 text-xs text-uber-gray-mid">
+        <span>
+          <span className="inline-block w-3.5 h-3.5 rounded-[3px] mr-1.5 align-middle shadow-sm bg-[#283240] border border-white/10" />{' '}
+          Unexplored
+        </span>
+        <span>
+          <span className="inline-block w-3.5 h-3.5 rounded-[3px] mr-1.5 align-middle shadow-sm bg-[rgb(30,140,80)]" />{' '}
+          Cool
+        </span>
+        <span>
+          <span className="inline-block w-3.5 h-3.5 rounded-[3px] mr-1.5 align-middle shadow-sm bg-[rgb(255,200,50)]" />{' '}
+          Warm
+        </span>
+        <span>
+          <span className="inline-block w-3.5 h-3.5 rounded-[3px] mr-1.5 align-middle shadow-sm bg-[rgb(255,65,45)]" />{' '}
+          Hot
+        </span>
       </div>
     </div>
   )

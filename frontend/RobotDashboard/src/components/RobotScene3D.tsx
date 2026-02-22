@@ -1,10 +1,7 @@
 import { Canvas } from '@react-three/fiber'
-import './RobotScene3D.css'
 import { OrbitControls, Line } from '@react-three/drei'
 import { useMemo } from 'react'
-import * as THREE from 'three'
 
-// Robot model dimensions (from RobotDashboard)
 const wheelRadius = 0.16
 const wheelWidth = 0.08
 const casterRadius = 0.06
@@ -16,12 +13,18 @@ const wheelZ = bodyDepth / 2 + wheelWidth / 2
 const servoHeight = 0.2
 const servoRadius = 0.04
 
-const wheelPositions = [
+const wheelPositions: [number, number, number][] = [
   [-wheelX, wheelRadius / 2, -wheelZ + wheelRadius],
   [wheelX, wheelRadius / 2, -wheelZ + wheelRadius],
 ]
 
-function Robot3D({ x, y, theta }) {
+interface Robot3DProps {
+  x: number
+  y: number
+  theta: number
+}
+
+function Robot3D({ x, y, theta }: Robot3DProps) {
   const headingRad = theta + (3 * Math.PI) / 2
   return (
     <group position={[x, 0, y]} rotation={[0, -headingRad, 0]}>
@@ -51,11 +54,10 @@ function Robot3D({ x, y, theta }) {
   )
 }
 
-// Same 17–24°C sensitive gradient as 2D heatmap
-function tempToColorHex(temp) {
+function tempToColorHex(temp: number): number {
   const t = Math.max(17, Math.min(24, temp))
   const x = Math.pow((t - 17) / 7, 0.55)
-  let r, g, b
+  let r: number, g: number, b: number
   if (x <= 0.33) {
     const s = x / 0.33
     r = Math.round(25 + (110 - 25) * s)
@@ -77,13 +79,22 @@ function tempToColorHex(temp) {
 
 const UNEXPLORED_COLOR = 0x283240
 
-function FloorGrid({ grid, rows, cols, heatmapRows = 0, heatmapCols = 0, heatmapCells = {} }) {
+interface FloorGridProps {
+  grid: number[][]
+  rows: number
+  cols: number
+  heatmapRows: number
+  heatmapCols: number
+  heatmapCells: Record<string, number>
+}
+
+function FloorGrid({ grid, rows, cols, heatmapRows = 0, heatmapCols = 0, heatmapCells = {} }: FloorGridProps) {
   const cellSize = 1
   const subdivR = heatmapRows > rows ? Math.floor(heatmapRows / rows) : 1
   const subdivC = heatmapCols > cols ? Math.floor(heatmapCols / cols) : 1
 
   const cells = useMemo(() => {
-    const out = []
+    const out: { row: number; col: number; cell: number; color: number }[] = []
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < cols; col++) {
         const cell = grid[row]?.[col] ?? 0
@@ -96,17 +107,15 @@ function FloorGrid({ grid, rows, cols, heatmapRows = 0, heatmapCols = 0, heatmap
             const fr = row * subdivR + dr
             const fc = col * subdivC + dc
             const t = heatmapCells[`${fr},${fc}`]
-            if (t != null) { sum += t; n++ }
+            if (t != null) {
+              sum += t
+              n++
+            }
           }
         }
         const temp = n > 0 ? sum / n : heatmapCells[`${row},${col}`]
         if (temp != null && cell !== 0) tempColor = tempToColorHex(temp)
-        out.push({
-          row,
-          col,
-          cell,
-          color: tempColor,
-        })
+        out.push({ row, col, cell, color: tempColor })
       }
     }
     return out
@@ -136,16 +145,31 @@ function FloorGrid({ grid, rows, cols, heatmapRows = 0, heatmapCols = 0, heatmap
   )
 }
 
-function TrailLine({ trail }) {
+interface TrailLineProps {
+  trail: [number, number][] | null | undefined
+}
+
+function TrailLine({ trail }: TrailLineProps) {
   const points = useMemo(() => {
     if (!trail || trail.length < 2) return []
-    return trail.map(([x, y]) => [x, 0.02, y])
+    return trail.map(([x, y]) => [x, 0.02, y] as [number, number, number])
   }, [trail])
   if (points.length < 2) return null
   return <Line points={points} color="#00d4aa" />
 }
 
-function ThermalPointCloud({ heatmapPoints }) {
+interface HeatmapPoint {
+  x: number
+  y: number
+  z: number
+  color: number
+}
+
+interface ThermalPointCloudProps {
+  heatmapPoints: HeatmapPoint[]
+}
+
+function ThermalPointCloud({ heatmapPoints }: ThermalPointCloudProps) {
   if (!heatmapPoints || heatmapPoints.length === 0) return null
   const positions = new Float32Array(heatmapPoints.length * 3)
   const colors = new Float32Array(heatmapPoints.length * 3)
@@ -161,21 +185,32 @@ function ThermalPointCloud({ heatmapPoints }) {
   return (
     <points>
       <bufferGeometry>
-        <bufferAttribute attach="attributes-position" count={heatmapPoints.length} array={positions} itemSize={3} />
-        <bufferAttribute attach="attributes-color" count={heatmapPoints.length} array={colors} itemSize={3} />
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+        <bufferAttribute attach="attributes-color" args={[colors, 3]} />
       </bufferGeometry>
       <pointsMaterial size={0.15} vertexColors sizeAttenuation />
     </points>
   )
 }
 
-function Scene3D({ state, trail, grid, rows, cols, heatmapRows, heatmapCols, heatmapCells = {} }) {
+interface Scene3DProps {
+  state: { position?: { x: number; y: number; theta?: number } } | null | undefined
+  trail: [number, number][] | null | undefined
+  grid: number[][]
+  rows: number
+  cols: number
+  heatmapRows: number
+  heatmapCols: number
+  heatmapCells: Record<string, number>
+}
+
+function Scene3D({ state, trail, grid, rows, cols, heatmapRows, heatmapCols, heatmapCells = {} }: Scene3DProps) {
   const heatmapPoints = useMemo(() => {
-    const pts = []
+    const pts: HeatmapPoint[] = []
     if (!trail || trail.length === 0) return pts
     const subdivR = heatmapRows > rows ? Math.floor(heatmapRows / rows) : 1
     const subdivC = heatmapCols > cols ? Math.floor(heatmapCols / cols) : 1
-    const seen = new Set()
+    const seen = new Set<string>()
     for (const [x, y] of trail) {
       const col = Math.floor(x)
       const row = Math.floor(y)
@@ -188,7 +223,10 @@ function Scene3D({ state, trail, grid, rows, cols, heatmapRows, heatmapCols, hea
       for (let dr = 0; dr < subdivR; dr++) {
         for (let dc = 0; dc < subdivC; dc++) {
           const t = heatmapCells[`${row * subdivR + dr},${col * subdivC + dc}`]
-          if (t != null) { sum += t; n++ }
+          if (t != null) {
+            sum += t
+            n++
+          }
         }
       }
       const temp = n > 0 ? sum / n : heatmapCells[key]
@@ -212,7 +250,14 @@ function Scene3D({ state, trail, grid, rows, cols, heatmapRows, heatmapCols, hea
       <directionalLight position={[10, 15, 10]} intensity={1.2} castShadow />
       <directionalLight position={[-8, 10, -5]} intensity={0.5} />
       <directionalLight position={[0, 20, 0]} intensity={0.3} />
-      <FloorGrid grid={grid} rows={rows} cols={cols} heatmapRows={heatmapRows} heatmapCols={heatmapCols} heatmapCells={heatmapCells} />
+      <FloorGrid
+        grid={grid}
+        rows={rows}
+        cols={cols}
+        heatmapRows={heatmapRows}
+        heatmapCols={heatmapCols}
+        heatmapCells={heatmapCells}
+      />
       <Robot3D x={robotPos.x} y={robotPos.y} theta={robotPos.theta ?? 0} />
       <TrailLine trail={trail} />
       <ThermalPointCloud heatmapPoints={heatmapPoints} />
@@ -227,19 +272,52 @@ function Scene3D({ state, trail, grid, rows, cols, heatmapRows, heatmapCols, hea
   )
 }
 
-export default function RobotScene3D({ state, trail, grid = [], rows = 9, cols = 19, heatmapRows = 0, heatmapCols = 0, heatmapCells = {}, connected }) {
+interface RobotState {
+  position?: { x: number; y: number; theta?: number }
+  ultrasonic_distance_cm?: number
+  temperature_c?: number
+  humidity_percent?: number
+}
+
+interface RobotScene3DProps {
+  state: RobotState | null | undefined
+  trail?: [number, number][] | null
+  grid?: number[][]
+  rows?: number
+  cols?: number
+  heatmapRows?: number
+  heatmapCols?: number
+  heatmapCells?: Record<string, number>
+  connected?: boolean
+}
+
+export default function RobotScene3D({
+  state,
+  trail,
+  grid = [],
+  rows = 9,
+  cols = 19,
+  heatmapRows = 0,
+  heatmapCols = 0,
+  heatmapCells = {},
+  connected,
+}: RobotScene3DProps) {
   const r = rows || 9
   const c = cols || 19
   return (
-    <div className="robot-scene-3d">
+    <div className="relative w-full h-[450px] min-h-[450px] bg-[#0f1419] [&_canvas]:block [&_canvas]:w-full [&_canvas]:h-full [&_canvas]:min-h-[450px]">
       {!connected && (
-        <div className="robot-scene-overlay">Connecting...</div>
+        <div className="absolute top-3 left-3 right-3 z-10 text-center text-sm text-uber-gray-mid bg-[rgba(26,35,50,0.9)] py-2 px-3 rounded">
+          Connecting...
+        </div>
       )}
       {connected && !state?.position && (
-        <div className="robot-scene-overlay">Waiting for robot data...</div>
+        <div className="absolute top-3 left-3 right-3 z-10 text-center text-sm text-uber-gray-mid bg-[rgba(26,35,50,0.9)] py-2 px-3 rounded">
+          Waiting for robot data...
+        </div>
       )}
       {state && (
-        <div className="robot-scene-sensors">
+        <div className="absolute bottom-3 left-3 z-10 flex gap-4 text-xs font-mono text-cyan-400 bg-[rgba(26,35,50,0.9)] py-1.5 px-2.5 rounded">
           <span>Ultrasonic: {state.ultrasonic_distance_cm?.toFixed(0) ?? '—'} cm</span>
           <span>Temp: {state.temperature_c?.toFixed(1) ?? '—'} °C</span>
           <span>Humidity: {state.humidity_percent?.toFixed(0) ?? '—'} %</span>
@@ -249,7 +327,16 @@ export default function RobotScene3D({ state, trail, grid = [], rows = 9, cols =
         camera={{ position: [c / 2 + 5, 8, r / 2 + 5], fov: 50 }}
         gl={{ antialias: true }}
       >
-        <Scene3D state={state} trail={trail} grid={grid} rows={r} cols={c} heatmapRows={heatmapRows} heatmapCols={heatmapCols} heatmapCells={heatmapCells} />
+        <Scene3D
+          state={state}
+          trail={trail ?? null}
+          grid={grid}
+          rows={r}
+          cols={c}
+          heatmapRows={heatmapRows}
+          heatmapCols={heatmapCols}
+          heatmapCells={heatmapCells}
+        />
       </Canvas>
     </div>
   )

@@ -9,6 +9,7 @@ const navLinks = [
   { path: '/about', label: 'About' },
   { path: '/contact', label: 'Contact' },
   { path: '/dashboard', label: 'Dashboard' },
+  { path: '/live', label: 'ThermalScout' },
 ]
 
 export default function Layout({ children }: LayoutProps) {
