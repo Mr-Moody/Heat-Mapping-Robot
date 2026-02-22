@@ -1,6 +1,7 @@
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Line } from '@react-three/drei'
 import { useMemo } from 'react'
+import * as THREE from 'three'
 
 const wheelRadius = 0.16
 const wheelWidth = 0.08
@@ -30,7 +31,7 @@ function Robot3D({ x, y, theta }: Robot3DProps) {
     <group position={[x, 0, y]} rotation={[0, -headingRad, 0]}>
       <mesh position={[0, bodyHeight / 2, 0]}>
         <boxGeometry args={[bodyWidth, bodyHeight, bodyDepth]} />
-        <meshStandardMaterial color="#00d4aa" emissive="#003d30" />
+        <meshStandardMaterial color="#00d4aa" emissive="#00d4aa" emissiveIntensity={0.3} />
       </mesh>
       {wheelPositions.map((pos, i) => (
         <mesh key={i} position={pos} rotation={[0, 0, Math.PI / 2]}>
@@ -135,9 +136,9 @@ function FloorGrid({ grid, rows, cols, heatmapRows = 0, heatmapCols = 0, heatmap
           )
         }
         return (
-          <mesh key={`${row}-${col}`} position={[x, 0, z]} rotation={[-Math.PI / 2, 0, 0]}>
+          <mesh key={`${row}-${col}`} position={[x, 0.002, z]} rotation={[-Math.PI / 2, 0, 0]}>
             <planeGeometry args={[cellSize, cellSize]} />
-            <meshStandardMaterial color={color} />
+            <meshStandardMaterial color={color} side={THREE.DoubleSide} />
           </mesh>
         )
       })}
@@ -246,8 +247,8 @@ function Scene3D({ state, trail, grid, rows, cols, heatmapRows, heatmapCols, hea
 
   return (
     <>
-      <ambientLight intensity={0.9} />
-      <directionalLight position={[10, 15, 10]} intensity={1.2} castShadow />
+      <ambientLight intensity={1.1} />
+      <directionalLight position={[10, 20, 10]} intensity={1.3} castShadow />
       <directionalLight position={[-8, 10, -5]} intensity={0.5} />
       <directionalLight position={[0, 20, 0]} intensity={0.3} />
       <FloorGrid
@@ -264,9 +265,9 @@ function Scene3D({ state, trail, grid, rows, cols, heatmapRows, heatmapCols, hea
       <OrbitControls
         enableDamping
         dampingFactor={0.05}
-        minDistance={3}
-        maxDistance={40}
-        target={[cols / 2, 0, rows / 2]}
+        minDistance={5}
+        maxDistance={50}
+        target={[robotPos.x || cols / 2, 0, robotPos.y || rows / 2]}
       />
     </>
   )
@@ -324,7 +325,7 @@ export default function RobotScene3D({
         </div>
       )}
       <Canvas
-        camera={{ position: [c / 2 + 5, 8, r / 2 + 5], fov: 50 }}
+        camera={{ position: [c / 2 + 3, 12, r / 2 + 3], fov: 45 }}
         gl={{ antialias: true }}
       >
         <Scene3D

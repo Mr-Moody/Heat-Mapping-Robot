@@ -5,9 +5,8 @@ import AnalyticsPanel from '../components/AnalyticsPanel'
 import Alerts from '../components/Alerts'
 import SensorReadout from '../components/SensorReadout'
 
-const WS_URL = import.meta.env.DEV
-  ? 'ws://localhost:8000'
-  : (location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + location.host
+const WS_URL =
+  (location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + location.host
 
 interface RobotState {
   position?: { x: number; y: number; theta?: number }

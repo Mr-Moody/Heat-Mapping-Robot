@@ -94,7 +94,7 @@ export default function LiveMap({
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current
-    if (!canvas || !grid.length || !cols || !rows) return
+    if (!canvas || !Array.isArray(grid) || grid.length === 0 || !cols || !rows) return
 
     const res = Math.round(scale * PIXELS_PER_CELL)
     const w = cols * res
@@ -179,6 +179,16 @@ export default function LiveMap({
   const res = Math.round(scale * PIXELS_PER_CELL)
   const canvasW = Math.max(1, cols) * res
   const canvasH = Math.max(1, rows) * res
+  const hasValidGrid = Array.isArray(grid) && grid.length > 0 && rows > 0 && cols > 0
+
+  if (!hasValidGrid) {
+    return (
+      <div className="relative w-full h-full min-h-[260px] flex items-center justify-center bg-[#1a2332] rounded-lg">
+        <p className="text-uber-gray-mid text-sm">Loading map…</p>
+      </div>
+    )
+  }
+
   return (
     <div className="relative w-full h-full min-h-[260px] flex items-center justify-center">
       <canvas
